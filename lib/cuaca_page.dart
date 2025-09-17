@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'themes/colors.dart';
@@ -12,6 +11,7 @@ class CuacaCard extends StatelessWidget {
   final String angin;
   final String kelembapan;
   final String waktu;
+  final bool isToday; // 🔥 tambah flag hari ini
 
   const CuacaCard({
     super.key,
@@ -21,16 +21,17 @@ class CuacaCard extends StatelessWidget {
     required this.angin,
     required this.kelembapan,
     required this.waktu,
+    this.isToday = false,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 180,
+      width: MediaQuery.of(context).size.width * 0.9,
       margin: const EdgeInsets.only(right: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.primary,
+        color: isToday ? AppColors.primary : Colors.grey[800],
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
@@ -50,8 +51,8 @@ class CuacaCard extends StatelessWidget {
           const SizedBox(height: 8),
           Row(
             children: [
-              Image.asset(icon, width: 48, height: 48),
-              const SizedBox(width: 8),
+              Image.asset(icon, width: 84, height: 84),
+              const SizedBox(width: 12),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -113,7 +114,9 @@ class CuacaCard extends StatelessWidget {
 }
 
 class CuacaSection extends StatefulWidget {
-  const CuacaSection({super.key});
+  final String kodeWilayah; // contoh: "31.71.03.1001"
+
+  const CuacaSection({super.key, required this.kodeWilayah});
 
   @override
   State<CuacaSection> createState() => _CuacaSectionState();
@@ -121,64 +124,51 @@ class CuacaSection extends StatefulWidget {
 
 class _CuacaSectionState extends State<CuacaSection> {
   List<dynamic> prakiraan = [];
-  bool loading = true;
 
   @override
   void initState() {
     super.initState();
-    getLocationAndFetch();
+    fetchCuaca();
   }
 
-  Future<void> getLocationAndFetch() async {
+  Future<void> fetchCuaca() async {
+    final url =
+        "https://api.bmkg.go.id/publik/prakiraan-cuaca?adm4=${widget.kodeWilayah}";
+    print("📡 Fetching from: $url");
+
     try {
-      // Minta izin lokasi
-      LocationPermission permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied ||
-          permission == LocationPermission.deniedForever) {
-        print("❌ Lokasi ditolak user");
-        setState(() {
-          loading = false;
-        });
-        return;
-      }
-
-      // Ambil posisi user
-      Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      );
-
-      double lat = position.latitude;
-      double lon = position.longitude;
-
-      print("📍 Lokasi user: lat=$lat, lon=$lon");
-
-      // API BMKG cuaca by lat/lon
-      final url =
-          "https://api.bmkg.go.id/publik/prakiraan-cuaca?lat=$lat&lon=$lon";
-      print("🔗 Request ke: $url");
-
       final res = await http.get(Uri.parse(url));
-      print("📡 Status code: ${res.statusCode}");
+      print("📥 Status Code: ${res.statusCode}"); // Debugging status
+
       if (res.statusCode == 200) {
+        print("📥 Response Body: ${res.body.substring(0, 200)}...");
+        // hanya tampilkan 200 karakter pertama biar ga kepanjangan
+
         final data = jsonDecode(res.body);
-        print("📦 Response BMKG: $data");
+        print("✅ Parsed JSON: $data");
+
+        final List rawData = data["data"] ?? [];
+        List<dynamic> extracted = [];
+
+        if (rawData.isNotEmpty && rawData[0]["cuaca"] != null) {
+          // Flatten biar gampang dipakai di ListView
+          for (var entry in rawData[0]["cuaca"]) {
+            if (entry is List && entry.isNotEmpty) {
+              extracted.add(entry[0]);
+            }
+          }
+        }
 
         setState(() {
-          prakiraan = data["data"] ?? [];
-          print("✅ Jumlah data prakiraan: ${prakiraan.length}");
-          loading = false;
+          prakiraan = extracted;
         });
+
+        print("🌤️ Jumlah data cuaca: ${prakiraan.length}");
       } else {
-        print("❌ Gagal fetch BMKG: ${res.body}");
-        setState(() {
-          loading = false;
-        });
+        print("❌ Error: status ${res.statusCode}, body=${res.body}");
       }
     } catch (e) {
-      print("⚠️ Error fetchCuaca: $e");
-      setState(() {
-        loading = false;
-      });
+      print("🔥 Exception in fetchCuaca: $e");
     }
   }
 
@@ -186,33 +176,67 @@ class _CuacaSectionState extends State<CuacaSection> {
     if (desc.contains("Hujan")) return "assets/images/icon/cuaca/rain.png";
     if (desc.contains("Cerah")) return "assets/images/icon/cuaca/sunny.png";
     if (desc.contains("Berawan")) return "assets/images/icon/cuaca/cloudy.png";
-    if (desc.contains("Badai")) return "assets/images/icon/cuaca/thunder.png";
+    if (desc.contains("Badai")) {
+      return "assets/images/icon/cuaca/thunder.png";
+    }
     return "assets/images/icon/cuaca/cloud_and_rainny.png";
   }
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 200,
-      child: loading
-          ? const Center(child: CircularProgressIndicator())
-          : prakiraan.isEmpty
-          ? const Center(child: Text("Data cuaca tidak tersedia"))
-          : ListView.builder(
-              scrollDirection: Axis.horizontal,
-              itemCount: prakiraan.length,
-              itemBuilder: (context, index) {
-                final item = prakiraan[index];
-                return CuacaCard(
-                  icon: getIcon(item["weather_desc"] ?? ""),
-                  suhu: item["t"].toString(),
-                  kondisi: item["weather_desc"] ?? "",
-                  angin: "${item["ws"]} km/h",
-                  kelembapan: item["hu"].toString(),
-                  waktu: item["local_datetime"].toString(),
-                );
-              },
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          "Prakiraan Cuaca",
+          style: GoogleFonts.quicksand(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          height: 200,
+          child: prakiraan.isEmpty
+              ? const Center(
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation(AppColors.primary),
+                  ),
+                )
+              : PageView.builder(
+                  controller: PageController(viewportFraction: 0.95),
+                  itemCount: prakiraan.length,
+                  itemBuilder: (context, index) {
+                    final item = prakiraan[index];
+                    final waktu = item["local_datetime"].toString();
+
+                    return CuacaCard(
+                      icon: getIcon(item["weather_desc"] ?? ""),
+                      suhu: item["t"].toString(),
+                      kondisi: item["weather_desc"] ?? "",
+                      angin: "${item["ws"]} km/h",
+                      kelembapan: item["hu"].toString(),
+                      waktu: waktu,
+                      isToday: index == 0, // card pertama dianggap hari ini
+                    );
+                  },
+                ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Text(
+              "Sumber: ",
+              style: TextStyle(fontSize: 10, color: AppColors.text),
             ),
+            SizedBox(width: 4),
+            SizedBox(
+              height: 16,
+              child: Image.asset("assets/images/logo/logo-bmkg.png"),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }
