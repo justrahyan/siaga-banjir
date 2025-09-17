@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
+import 'package:siaga_banjir/home_page.dart';
 import 'themes/colors.dart';
 
 class CuacaCard extends StatelessWidget {
@@ -11,7 +12,7 @@ class CuacaCard extends StatelessWidget {
   final String angin;
   final String kelembapan;
   final String waktu;
-  final bool isToday; // 🔥 tambah flag hari ini
+  final bool isToday;
 
   const CuacaCard({
     super.key,
@@ -51,7 +52,13 @@ class CuacaCard extends StatelessWidget {
           const SizedBox(height: 8),
           Row(
             children: [
-              Image.asset(icon, width: 84, height: 84),
+              Image.network(
+                icon,
+                width: 84,
+                height: 84,
+                errorBuilder: (ctx, err, stack) =>
+                    const Icon(Icons.cloud, color: Colors.white, size: 64),
+              ),
               const SizedBox(width: 12),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -114,72 +121,45 @@ class CuacaCard extends StatelessWidget {
 }
 
 class CuacaSection extends StatefulWidget {
-  final String kodeWilayah; // contoh: "31.71.03.1001"
-
-  const CuacaSection({super.key, required this.kodeWilayah});
+  const CuacaSection({super.key});
 
   @override
   State<CuacaSection> createState() => _CuacaSectionState();
 }
 
 class _CuacaSectionState extends State<CuacaSection> {
-  List<dynamic> prakiraan = [];
+  Map<String, dynamic>? cuaca;
 
   @override
   void initState() {
     super.initState();
-    fetchCuaca();
+    getCurrentLocation().then((pos) {
+      fetchCuaca(pos.latitude, pos.longitude);
+    });
   }
 
-  Future<void> fetchCuaca() async {
+  Future<void> fetchCuaca(double lat, double lon) async {
+    const apiKey = "bb2dd84ca2541574dac0faffefcb4e45";
     final url =
-        "https://api.bmkg.go.id/publik/prakiraan-cuaca?adm4=${widget.kodeWilayah}";
-    print("📡 Fetching from: $url");
+        "https://api.openweathermap.org/data/2.5/weather?lat=$lat&lon=$lon&appid=$apiKey&units=metric&lang=id";
 
     try {
       final res = await http.get(Uri.parse(url));
-      print("📥 Status Code: ${res.statusCode}"); // Debugging status
-
       if (res.statusCode == 200) {
-        print("📥 Response Body: ${res.body.substring(0, 200)}...");
-        // hanya tampilkan 200 karakter pertama biar ga kepanjangan
-
         final data = jsonDecode(res.body);
-        print("✅ Parsed JSON: $data");
-
-        final List rawData = data["data"] ?? [];
-        List<dynamic> extracted = [];
-
-        if (rawData.isNotEmpty && rawData[0]["cuaca"] != null) {
-          // Flatten biar gampang dipakai di ListView
-          for (var entry in rawData[0]["cuaca"]) {
-            if (entry is List && entry.isNotEmpty) {
-              extracted.add(entry[0]);
-            }
-          }
-        }
-
         setState(() {
-          prakiraan = extracted;
+          cuaca = data;
         });
-
-        print("🌤️ Jumlah data cuaca: ${prakiraan.length}");
       } else {
-        print("❌ Error: status ${res.statusCode}, body=${res.body}");
+        print("❌ Error: ${res.body}");
       }
     } catch (e) {
-      print("🔥 Exception in fetchCuaca: $e");
+      print("🔥 Exception: $e");
     }
   }
 
-  String getIcon(String desc) {
-    if (desc.contains("Hujan")) return "assets/images/icon/cuaca/rain.png";
-    if (desc.contains("Cerah")) return "assets/images/icon/cuaca/sunny.png";
-    if (desc.contains("Berawan")) return "assets/images/icon/cuaca/cloudy.png";
-    if (desc.contains("Badai")) {
-      return "assets/images/icon/cuaca/thunder.png";
-    }
-    return "assets/images/icon/cuaca/cloud_and_rainny.png";
+  String getIconUrl(String iconCode) {
+    return "https://openweathermap.org/img/wn/$iconCode@2x.png";
   }
 
   @override
@@ -197,29 +177,25 @@ class _CuacaSectionState extends State<CuacaSection> {
         const SizedBox(height: 8),
         SizedBox(
           height: 200,
-          child: prakiraan.isEmpty
+          child: cuaca == null
               ? const Center(
                   child: CircularProgressIndicator(
                     valueColor: AlwaysStoppedAnimation(AppColors.primary),
                   ),
                 )
-              : PageView.builder(
+              : PageView(
                   controller: PageController(viewportFraction: 0.95),
-                  itemCount: prakiraan.length,
-                  itemBuilder: (context, index) {
-                    final item = prakiraan[index];
-                    final waktu = item["local_datetime"].toString();
-
-                    return CuacaCard(
-                      icon: getIcon(item["weather_desc"] ?? ""),
-                      suhu: item["t"].toString(),
-                      kondisi: item["weather_desc"] ?? "",
-                      angin: "${item["ws"]} km/h",
-                      kelembapan: item["hu"].toString(),
-                      waktu: waktu,
-                      isToday: index == 0, // card pertama dianggap hari ini
-                    );
-                  },
+                  children: [
+                    CuacaCard(
+                      icon: getIconUrl(cuaca!["weather"][0]["icon"]),
+                      suhu: cuaca!["main"]["temp"].toString(),
+                      kondisi: cuaca!["weather"][0]["description"],
+                      angin: "${cuaca!["wind"]["speed"]} m/s",
+                      kelembapan: cuaca!["main"]["humidity"].toString(),
+                      waktu: DateTime.now().toLocal().toString(),
+                      isToday: true,
+                    ),
+                  ],
                 ),
         ),
         const SizedBox(height: 8),
@@ -229,10 +205,10 @@ class _CuacaSectionState extends State<CuacaSection> {
               "Sumber: ",
               style: TextStyle(fontSize: 10, color: AppColors.text),
             ),
-            SizedBox(width: 4),
+            const SizedBox(width: 4),
             SizedBox(
-              height: 16,
-              child: Image.asset("assets/images/logo/logo-bmkg.png"),
+              height: 24,
+              child: Image.asset("assets/images/logo/logo-openweathermap.png"),
             ),
           ],
         ),

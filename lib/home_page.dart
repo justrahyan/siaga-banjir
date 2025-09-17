@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:siaga_banjir/cuaca_page.dart';
 import 'package:siaga_banjir/themes/colors.dart';
@@ -8,6 +9,35 @@ class HomePage extends StatefulWidget {
 
   @override
   _HomePageState createState() => _HomePageState();
+}
+
+Future<Position> getCurrentLocation() async {
+  bool serviceEnabled;
+  LocationPermission permission;
+
+  // cek apakah GPS nyala
+  serviceEnabled = await Geolocator.isLocationServiceEnabled();
+  if (!serviceEnabled) {
+    throw Exception("GPS tidak aktif");
+  }
+
+  // cek izin
+  permission = await Geolocator.checkPermission();
+  if (permission == LocationPermission.denied) {
+    permission = await Geolocator.requestPermission();
+    if (permission == LocationPermission.denied) {
+      throw Exception("Izin lokasi ditolak");
+    }
+  }
+
+  if (permission == LocationPermission.deniedForever) {
+    throw Exception("Izin lokasi permanen ditolak");
+  }
+
+  // ambil posisi sekarang
+  return await Geolocator.getCurrentPosition(
+    desiredAccuracy: LocationAccuracy.high,
+  );
 }
 
 class _HomePageState extends State<HomePage> {
@@ -62,7 +92,7 @@ class _HomePageState extends State<HomePage> {
               const SizedBox(height: 16),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: CuacaSection(kodeWilayah: "31.71.03.1001"),
+                child: CuacaSection(),
               ),
             ],
           ),
