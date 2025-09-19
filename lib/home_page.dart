@@ -47,7 +47,7 @@ class _HomePageState extends State<HomePage> {
   final int _batteryPercentage = 43;
 
   // Dummy Sumber Daya
-  final int dummyHour = 20;
+  final int dummyHour = 12;
 
   // Data Sumber Daya Dinamis
   // final String _powerSource =

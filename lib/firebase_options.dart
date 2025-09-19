@@ -41,48 +41,49 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyBi8JPnSTu3SO2oqN5710rQBlokCWpJJsY',
-    appId: '1:877759372264:web:bd96559ad4d82dff2da25d',
-    messagingSenderId: '877759372264',
-    projectId: 'siaga-banjir-ca823',
-    authDomain: 'siaga-banjir-ca823.firebaseapp.com',
-    storageBucket: 'siaga-banjir-ca823.firebasestorage.app',
-    measurementId: 'G-K2PXFFZ61B',
+    apiKey: 'AIzaSyA0GO49xIdpaeGt5wGR-Vu2UFRnFbMVsEo',
+    appId: '1:787166487096:web:6d45f4b947cc727d5d3ccd',
+    messagingSenderId: '787166487096',
+    projectId: 'siaga-banjir-b73a8',
+    authDomain: 'siaga-banjir-b73a8.firebaseapp.com',
+    storageBucket: 'siaga-banjir-b73a8.firebasestorage.app',
+    measurementId: 'G-SLRSBPBM0Z',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyBpCb_LEFCLZk1S9zI0etvs4X9nHKjBJmo',
-    appId: '1:877759372264:android:cfcdc45f80510ff02da25d',
-    messagingSenderId: '877759372264',
-    projectId: 'siaga-banjir-ca823',
-    storageBucket: 'siaga-banjir-ca823.firebasestorage.app',
+    apiKey: 'AIzaSyDOiOXqMRENpFYPIAKKBREN-p0YiV1bHkY',
+    appId: '1:787166487096:android:2858c4803b40e5db5d3ccd',
+    messagingSenderId: '787166487096',
+    projectId: 'siaga-banjir-b73a8',
+    storageBucket: 'siaga-banjir-b73a8.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyBxAYdynjcQGmh8PRLcPgGRagpkAPNcu6E',
-    appId: '1:877759372264:ios:ddf3ba1fafe4aa122da25d',
-    messagingSenderId: '877759372264',
-    projectId: 'siaga-banjir-ca823',
-    storageBucket: 'siaga-banjir-ca823.firebasestorage.app',
+    apiKey: 'AIzaSyDVJnomI9JUk6RyLnGh2CzrzlgmkFWK05U',
+    appId: '1:787166487096:ios:ff45fad1904788a95d3ccd',
+    messagingSenderId: '787166487096',
+    projectId: 'siaga-banjir-b73a8',
+    storageBucket: 'siaga-banjir-b73a8.firebasestorage.app',
     iosBundleId: 'com.example.siagaBanjir',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'AIzaSyBxAYdynjcQGmh8PRLcPgGRagpkAPNcu6E',
-    appId: '1:877759372264:ios:ddf3ba1fafe4aa122da25d',
-    messagingSenderId: '877759372264',
-    projectId: 'siaga-banjir-ca823',
-    storageBucket: 'siaga-banjir-ca823.firebasestorage.app',
+    apiKey: 'AIzaSyDVJnomI9JUk6RyLnGh2CzrzlgmkFWK05U',
+    appId: '1:787166487096:ios:ff45fad1904788a95d3ccd',
+    messagingSenderId: '787166487096',
+    projectId: 'siaga-banjir-b73a8',
+    storageBucket: 'siaga-banjir-b73a8.firebasestorage.app',
     iosBundleId: 'com.example.siagaBanjir',
   );
 
   static const FirebaseOptions windows = FirebaseOptions(
-    apiKey: 'AIzaSyBi8JPnSTu3SO2oqN5710rQBlokCWpJJsY',
-    appId: '1:877759372264:web:091efa93a33012b62da25d',
-    messagingSenderId: '877759372264',
-    projectId: 'siaga-banjir-ca823',
-    authDomain: 'siaga-banjir-ca823.firebaseapp.com',
-    storageBucket: 'siaga-banjir-ca823.firebasestorage.app',
-    measurementId: 'G-JMYR78ZZXK',
+    apiKey: 'AIzaSyA0GO49xIdpaeGt5wGR-Vu2UFRnFbMVsEo',
+    appId: '1:787166487096:web:6f9a50889791f5955d3ccd',
+    messagingSenderId: '787166487096',
+    projectId: 'siaga-banjir-b73a8',
+    authDomain: 'siaga-banjir-b73a8.firebaseapp.com',
+    storageBucket: 'siaga-banjir-b73a8.firebasestorage.app',
+    measurementId: 'G-G9R9CTPC00',
   );
+
 }

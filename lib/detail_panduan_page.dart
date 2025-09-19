@@ -14,21 +14,28 @@ class PanduanDetailPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
         title: Text(
           title,
-          style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+          style: GoogleFonts.quicksand(
+            fontWeight: FontWeight.w700,
+            fontSize: 18,
+          ),
         ),
         centerTitle: true,
         backgroundColor: Colors.white,
-        elevation: 4,
+        surfaceTintColor: Colors.white,
+        elevation: 0,
         shadowColor: Colors.black26,
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: Text(
-          content,
-          style: GoogleFonts.quicksand(fontSize: 15, height: 1.6),
+        child: SingleChildScrollView(
+          child: Text(
+            content,
+            style: GoogleFonts.quicksand(fontSize: 14, height: 1.6),
+          ),
         ),
       ),
     );

@@ -4,10 +4,13 @@ import 'package:siaga_banjir/main_screen.dart';
 import 'package:siaga_banjir/splash_screen.dart';
 import 'package:siaga_banjir/themes/colors.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await initializeDateFormatting('id_ID', null); // inisialisasi locale Indo
+  await initializeDateFormatting('id_ID', null);
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   runApp(const MyApp());
 }
 

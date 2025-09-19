@@ -284,29 +284,32 @@ class _CuacaSectionState extends State<CuacaSection> {
             const SizedBox(width: 4),
             Row(
               children: [
+                // SizedBox(
+                //   height: 24,
+                //   child: Image.asset(
+                //     "assets/images/logo/logo-openweathermap.png",
+                //   ),
+                // ),
+                // SizedBox(width: 8),
+                // Text(
+                //   'Open Weather Map',
+                //   style: GoogleFonts.quicksand(
+                //     fontSize: 12,
+                //     fontWeight: FontWeight.w600,
+                //   ),
+                // ),
                 SizedBox(
                   height: 24,
-                  child: Image.asset(
-                    "assets/images/logo/logo-openweathermap.png",
-                  ),
+                  child: Image.asset("assets/images/logo/logo-bmkg.png"),
                 ),
                 SizedBox(width: 8),
                 Text(
-                  'Open Weather Map',
+                  'Badan Meteorologi, Klimatologi, dan Geofisika',
                   style: GoogleFonts.quicksand(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                // SizedBox(
-                //   height: 24,
-                //   child: Image.asset("assets/images/logo/logo-bmkg.png"),
-                // ),
-                // SizedBox(width: 8),
-                // Text(
-                //   'Badan Meteorologi, Klimatologi, dan Geofisika',
-                //   style: GoogleFonts.quicksand(fontSize: 12, fontWeight: FontWeight.w600,),
-                // ),
               ],
             ),
           ],
