@@ -41,7 +41,7 @@ class _SplashScreenState extends State<SplashScreen> {
             const SizedBox(height: 24),
             Text(
               'Siaga Banjir',
-              style: GoogleFonts.poppins(
+              style: GoogleFonts.quicksand(
                 fontSize: 32,
                 fontWeight: FontWeight.bold,
                 color: Colors.white,
@@ -50,7 +50,7 @@ class _SplashScreenState extends State<SplashScreen> {
             const SizedBox(height: 8),
             Text(
               'Sistem Peringatan Dini Banjir',
-              style: GoogleFonts.poppins(
+              style: GoogleFonts.quicksand(
                 fontSize: 16,
                 color: Colors.white.withOpacity(0.8),
               ),

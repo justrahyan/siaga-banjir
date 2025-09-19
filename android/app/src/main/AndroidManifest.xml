@@ -14,6 +14,9 @@
         android:label="Siaga Banjir"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="AIzaSyD50X5aMLzuGaFJfdcJ_XDOlXnBAzGL07A"/>
         <activity
             android:name=".MainActivity"
             android:exported="true"

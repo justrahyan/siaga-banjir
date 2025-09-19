@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:siaga_banjir/cuaca_page.dart';
+import 'package:siaga_banjir/components/bottom_sheet.dart';
+import 'package:siaga_banjir/components/cuaca_card.dart';
 import 'package:siaga_banjir/themes/colors.dart';
 
 class HomePage extends StatefulWidget {
@@ -43,11 +44,12 @@ Future<Position> getCurrentLocation() async {
 class _HomePageState extends State<HomePage> {
   final String _locationName = 'Jembatan Kembar Gowa';
   final String _connectionStatus = 'Online';
-  final int _batteryPercentage = 86;
+  final int _batteryPercentage = 43;
 
   // Dummy Sumber Daya
-  final int dummyHour = 16;
+  final int dummyHour = 20;
 
+  // Data Sumber Daya Dinamis
   // final String _powerSource =
   //     DateTime.now().hour >= 6 && DateTime.now().hour < 18
   //     ? 'Solar Panel'
@@ -92,7 +94,7 @@ class _HomePageState extends State<HomePage> {
               const SizedBox(height: 16),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: CuacaSection(),
+                child: CuacaSection(kodeWilayah: "31.71.03.1001"),
               ),
             ],
           ),
@@ -111,7 +113,7 @@ class _HomePageState extends State<HomePage> {
         ? 'assets/images/solar-panel.png'
         : 'assets/images/battery.png';
     return Container(
-      padding: const EdgeInsets.only(top: 12, left: 16, right: 16, bottom: 16),
+      padding: const EdgeInsets.only(top: 12, left: 16, right: 16),
       decoration: const BoxDecoration(
         color: AppColors.primary,
         borderRadius: BorderRadius.only(
@@ -183,7 +185,7 @@ class _HomePageState extends State<HomePage> {
               const Spacer(),
               Container(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
+                  horizontal: 10,
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
@@ -192,10 +194,10 @@ class _HomePageState extends State<HomePage> {
                 ),
                 child: Text(
                   '$_batteryPercentage%',
-                  style: GoogleFonts.poppins(
+                  style: GoogleFonts.quicksand(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
-                    fontSize: 14,
+                    fontSize: 12,
                   ),
                 ),
               ),
@@ -223,6 +225,30 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 10),
+
+          Center(
+            child: TextButton(
+              onPressed: () {
+                showDeviceDetail(
+                  context,
+                  connectionStatus: _connectionStatus,
+                  powerSource: _powerSource,
+                  batteryPercentage: _batteryPercentage,
+                );
+              },
+              child: Text(
+                "Lihat Detail",
+                style: GoogleFonts.quicksand(
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                  decoration: TextDecoration.underline,
+                  decorationColor: Colors.white,
+                  decorationThickness: 2,
+                ),
+              ),
+            ),
           ),
         ],
       ),

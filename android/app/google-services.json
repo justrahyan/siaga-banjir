@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "877759372264",
+    "project_id": "siaga-banjir-ca823",
+    "storage_bucket": "siaga-banjir-ca823.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:877759372264:android:cfcdc45f80510ff02da25d",
+        "android_client_info": {
+          "package_name": "com.example.siaga_banjir"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBpCb_LEFCLZk1S9zI0etvs4X9nHKjBJmo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

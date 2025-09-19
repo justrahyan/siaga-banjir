@@ -18,9 +18,9 @@ class _MainScreenState extends State<MainScreen> {
 
   final List<Widget> _screens = const [
     HomePage(),
-    PanduanPage(),
     PetaPage(),
-    RiwayatPage(),
+    PanduanPage(),
+    // RiwayatPage(),
   ];
 
   void _onItemTapped(int index) {
@@ -37,12 +37,29 @@ class _MainScreenState extends State<MainScreen> {
   }) {
     final bool isSelected = _selectedIndex == index;
     return BottomNavigationBarItem(
-      icon: Image.asset(
-        isSelected ? primaryIcon : secondaryIcon,
-        width: isSelected ? 26 : 32,
-        height: isSelected ? 26 : 32,
+      icon: Center(
+        child: Image.asset(
+          isSelected ? primaryIcon : secondaryIcon,
+          width: 28,
+          height: 28,
+        ),
       ),
-      label: isSelected ? label : "",
+      activeIcon: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Image.asset(primaryIcon, width: 28, height: 28),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: GoogleFonts.quicksand(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: AppColors.primary,
+            ),
+          ),
+        ],
+      ),
+      label: '',
     );
   }
 
@@ -54,6 +71,8 @@ class _MainScreenState extends State<MainScreen> {
         currentIndex: _selectedIndex,
         onTap: _onItemTapped,
         type: BottomNavigationBarType.fixed,
+        showUnselectedLabels: false,
+        showSelectedLabels: false,
         selectedLabelStyle: GoogleFonts.quicksand(
           fontSize: 12,
           fontWeight: FontWeight.w600,
@@ -75,16 +94,16 @@ class _MainScreenState extends State<MainScreen> {
           ),
           _buildNavItem(
             index: 2,
-            label: "Riwayat",
-            primaryIcon: 'assets/images/icon/riwayat-primary.png',
-            secondaryIcon: 'assets/images/icon/riwayat-secondary.png',
-          ),
-          _buildNavItem(
-            index: 3,
             label: "Panduan",
             primaryIcon: 'assets/images/icon/panduan-primary.png',
             secondaryIcon: 'assets/images/icon/panduan-secondary.png',
           ),
+          // _buildNavItem(
+          //   index: 2,
+          //   label: "Riwayat",
+          //   primaryIcon: 'assets/images/icon/riwayat-primary.png',
+          //   secondaryIcon: 'assets/images/icon/riwayat-secondary.png',
+          // ),
         ],
       ),
     );
