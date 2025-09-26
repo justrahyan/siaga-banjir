@@ -1,28 +1,24 @@
+import 'dart:async';
+import 'dart:convert';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_database/firebase_database.dart';
+import 'package:http/http.dart' as http;
 import 'package:siaga_banjir/components/bottom_sheet.dart';
 import 'package:siaga_banjir/components/cuaca_card.dart';
 import 'package:siaga_banjir/themes/colors.dart';
 
-class HomePage extends StatefulWidget {
-  const HomePage({super.key});
-
-  @override
-  _HomePageState createState() => _HomePageState();
-}
-
+// 🛰️ Ambil lokasi pengguna
 Future<Position> getCurrentLocation() async {
   bool serviceEnabled;
   LocationPermission permission;
 
-  // cek apakah GPS nyala
   serviceEnabled = await Geolocator.isLocationServiceEnabled();
-  if (!serviceEnabled) {
-    throw Exception("GPS tidak aktif");
-  }
+  if (!serviceEnabled) throw Exception("GPS tidak aktif");
 
-  // cek izin
   permission = await Geolocator.checkPermission();
   if (permission == LocationPermission.denied) {
     permission = await Geolocator.requestPermission();
@@ -35,37 +31,126 @@ Future<Position> getCurrentLocation() async {
     throw Exception("Izin lokasi permanen ditolak");
   }
 
-  // ambil posisi sekarang
   return await Geolocator.getCurrentPosition(
     desiredAccuracy: LocationAccuracy.high,
   );
+}
+
+class HomePage extends StatefulWidget {
+  const HomePage({super.key});
+
+  @override
+  _HomePageState createState() => _HomePageState();
 }
 
 class _HomePageState extends State<HomePage> {
   final String _locationName = 'Jembatan Kembar Gowa';
   final String _connectionStatus = 'Online';
   final int _batteryPercentage = 43;
-
-  // Dummy Sumber Daya
   final int dummyHour = 12;
 
-  // Data Sumber Daya Dinamis
-  // final String _powerSource =
-  //     DateTime.now().hour >= 6 && DateTime.now().hour < 18
-  //     ? 'Solar Panel'
-  //     : 'Baterai';
+  // --- Variabel Sensor ---
+  double? _waterLevelCm;
+  double? _ultrasonic;
+  bool _isLoading = true;
+  String _lastUpdated = "Menunggu data...";
+  double? _previousWaterLevel;
 
-  // final String _powerImage =
-  //     DateTime.now().hour >= 6 && DateTime.now().hour < 18
-  //     ? 'assets/images/solar-panel.png'
-  //     : 'assets/images/battery.png';
+  // --- Firebase ---
+  final _auth = FirebaseAuth.instance;
+  final _database = FirebaseDatabase.instanceFor(
+    app: Firebase.app(),
+    databaseURL:
+        'https://siaga-banjir-b73a8-default-rtdb.asia-southeast1.firebasedatabase.app/',
+  ).ref();
+
+  StreamSubscription? _waterLevelSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeFirebase();
+  }
+
+  @override
+  void dispose() {
+    _waterLevelSubscription?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _initializeFirebase() async {
+    try {
+      await _auth.signInWithEmailAndPassword(
+        email: 'admin@gmail.com',
+        password: 'admin123',
+      );
+      print("✅ Firebase login berhasil");
+
+      final dbRef = _database;
+
+      _waterLevelSubscription = dbRef.child('Sensor').onValue.listen((event) {
+        final data = event.snapshot.value;
+        print("📡 Data diterima: $data");
+
+        if (data != null && data is Map) {
+          setState(() {
+            _ultrasonic = ((data['Ultrasonic'] ?? 0) as num).toDouble();
+            _waterLevelCm =
+                ((data['WaterLevel'] ?? 0) as num).toDouble() / 10.0;
+            _lastUpdated = "Baru saja diperbarui";
+            _isLoading = false;
+          });
+          print("✅ Data diupdate: $_waterLevelCm cm");
+        } else {
+          print("⚠️ Data kosong atau format salah");
+          setState(() => _isLoading = false);
+        }
+      });
+    } catch (e) {
+      print("❌ Firebase error: $e");
+      setState(() => _isLoading = false);
+    }
+  }
+
+  String getTrend(double? currentLevel) {
+    if (currentLevel == null) return "stabil";
+    String trend = "stabil";
+    if (_previousWaterLevel != null) {
+      if (currentLevel > _previousWaterLevel! + 0.1) trend = "naik";
+      if (currentLevel < _previousWaterLevel! - 0.1) trend = "turun";
+    }
+    _previousWaterLevel = currentLevel;
+    return trend;
+  }
+
+  String getFloodStatus(double? ultrasonic) {
+    if (ultrasonic == null) return "Tidak Diketahui";
+
+    // Semakin besar nilai ultrasonic → air makin tinggi
+    if (ultrasonic >= 100) return "Bahaya"; // di atas 1000 cm → banjir berat
+    if (ultrasonic >= 50) return "Waspada"; // 500–999 cm → siaga
+    return "Aman"; // di bawah 500 cm → normal
+  }
+
+  IconData getArrowIcon(String trend) {
+    switch (trend) {
+      case "naik":
+        return Icons.north;
+      case "turun":
+        return Icons.south;
+      default:
+        return Icons.east;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final String currentTrend = getTrend(_ultrasonic);
+    final String currentStatus = getFloodStatus(_ultrasonic);
+
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
       body: SafeArea(
-        top: true,
         child: SingleChildScrollView(
           child: Column(
             children: [
@@ -73,23 +158,33 @@ class _HomePageState extends State<HomePage> {
               const SizedBox(height: 16),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: _buildWaterLevelCard(
-                        level: "50 cm",
-                        description: "Air Stabil",
+                child: _isLoading
+                    ? Row(
+                        children: [
+                          Expanded(child: _buildLoadingCard()),
+                          const SizedBox(width: 16),
+                          Expanded(child: _buildLoadingCard()),
+                        ],
+                      )
+                    : Row(
+                        children: [
+                          Expanded(
+                            child: _buildWaterLevelCard(
+                              level: _ultrasonic != null
+                                  ? "${_ultrasonic!.toStringAsFixed(1)} cm"
+                                  : "-- cm",
+                              trend: currentTrend,
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: _buildStatusCard(
+                              status: currentStatus,
+                              lastUpdated: _lastUpdated,
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: _buildStatusCard(
-                        status: "Bahaya",
-                        lastUpdated: "2 menit yang lalu",
-                      ),
-                    ),
-                  ],
-                ),
               ),
               const SizedBox(height: 16),
               Padding(
@@ -103,15 +198,122 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // Header
+  Widget _buildLoadingCard() {
+    return Container(
+      height: 120,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(15),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8),
+        ],
+      ),
+      child: const Center(child: CircularProgressIndicator()),
+    );
+  }
+
+  Widget _buildWaterLevelCard({required String level, required String trend}) {
+    return Container(
+      height: 120,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(15),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            "Ketinggian Air,",
+            style: GoogleFonts.quicksand(fontSize: 14, color: Colors.black54),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Text(
+                level,
+                style: GoogleFonts.quicksand(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.text,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Icon(getArrowIcon(trend), size: 16, color: AppColors.text),
+            ],
+          ),
+          const Spacer(),
+          Text(
+            "Tren air: $trend",
+            style: GoogleFonts.quicksand(fontSize: 12, color: Colors.black45),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatusCard({
+    required String status,
+    required String lastUpdated,
+  }) {
+    Color bgColor;
+    Color textColor;
+    switch (status) {
+      case "Aman":
+        bgColor = AppColors.bgAman;
+        textColor = AppColors.textAman;
+        break;
+      case "Waspada":
+        bgColor = AppColors.bgWaspada;
+        textColor = AppColors.textWaspada;
+        break;
+      case "Bahaya":
+        bgColor = AppColors.bgBahaya;
+        textColor = AppColors.textBahaya;
+        break;
+      default:
+        bgColor = Colors.grey.shade200;
+        textColor = Colors.black54;
+    }
+    return Container(
+      height: 120,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(15),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            status,
+            style: GoogleFonts.quicksand(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: textColor,
+            ),
+          ),
+          const Spacer(),
+          Text(
+            "Diperbarui $lastUpdated",
+            style: GoogleFonts.quicksand(fontSize: 12, color: Colors.black54),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildHeader() {
     final String _powerSource = dummyHour >= 6 && dummyHour < 18
         ? 'Solar Panel'
         : 'Baterai';
-
     final String _powerImage = dummyHour >= 6 && dummyHour < 18
         ? 'assets/images/solar-panel.png'
         : 'assets/images/battery.png';
+
     return Container(
       padding: const EdgeInsets.only(top: 12, left: 16, right: 16),
       decoration: const BoxDecoration(
@@ -124,10 +326,8 @@ class _HomePageState extends State<HomePage> {
           image: AssetImage('assets/images/pattern.png'),
           fit: BoxFit.none,
           alignment: Alignment.bottomRight,
-          scale: 1,
         ),
       ),
-
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -145,7 +345,7 @@ class _HomePageState extends State<HomePage> {
                   Text(
                     'Selamat datang di',
                     style: GoogleFonts.quicksand(
-                      color: Colors.white.withOpacity(0.9),
+                      color: Colors.white70,
                       fontSize: 14,
                     ),
                   ),
@@ -162,13 +362,9 @@ class _HomePageState extends State<HomePage> {
             ],
           ),
           const SizedBox(height: 24),
-
           Text(
             'Lokasi',
-            style: GoogleFonts.quicksand(
-              color: Colors.white.withOpacity(0.9),
-              fontSize: 14,
-            ),
+            style: GoogleFonts.quicksand(color: Colors.white70, fontSize: 14),
           ),
           Row(
             children: [
@@ -204,7 +400,6 @@ class _HomePageState extends State<HomePage> {
             ],
           ),
           const SizedBox(height: 16),
-
           Row(
             children: [
               Expanded(
@@ -227,7 +422,6 @@ class _HomePageState extends State<HomePage> {
             ],
           ),
           const SizedBox(height: 10),
-
           Center(
             child: TextButton(
               onPressed: () {
@@ -245,7 +439,6 @@ class _HomePageState extends State<HomePage> {
                   color: Colors.white,
                   decoration: TextDecoration.underline,
                   decorationColor: Colors.white,
-                  decorationThickness: 2,
                 ),
               ),
             ),
@@ -266,43 +459,27 @@ class _HomePageState extends State<HomePage> {
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.95),
         borderRadius: BorderRadius.circular(15),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
       ),
       child: Stack(
-        clipBehavior: Clip.hardEdge,
         children: [
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 180),
-                  child: Text(
-                    title,
-                    style: GoogleFonts.quicksand(
-                      color: AppColors.text,
-                      fontSize: 14,
-                    ),
-                    overflow: TextOverflow.ellipsis,
+                Text(
+                  title,
+                  style: GoogleFonts.quicksand(
+                    color: AppColors.text,
+                    fontSize: 14,
                   ),
                 ),
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 100),
-                  child: Text(
-                    value,
-                    style: GoogleFonts.quicksand(
-                      color: valueColor,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    softWrap: true,
+                Text(
+                  value,
+                  style: GoogleFonts.quicksand(
+                    color: valueColor,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
               ],
@@ -317,130 +494,6 @@ class _HomePageState extends State<HomePage> {
               height: 80,
               fit: BoxFit.contain,
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildWaterLevelCard({
-    required String level,
-    required String description,
-  }) {
-    return Container(
-      height: 120,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(15),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            "Ketinggian Air,",
-            style: GoogleFonts.quicksand(fontSize: 14, color: Colors.black54),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Text(
-                level,
-                style: GoogleFonts.quicksand(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.text,
-                ),
-              ),
-              const SizedBox(width: 6),
-              Icon(getArrowIcon("stabil"), size: 16, color: AppColors.text),
-            ],
-          ),
-
-          const Spacer(),
-          Text(
-            description,
-            style: GoogleFonts.quicksand(fontSize: 12, color: Colors.black45),
-          ),
-        ],
-      ),
-    );
-  }
-
-  IconData getArrowIcon(String status) {
-    switch (status.toLowerCase()) {
-      case "naik":
-        return Icons.north;
-      case "stabil":
-        return Icons.east;
-      case "turun":
-        return Icons.south;
-      default:
-        return Icons.help_outline;
-    }
-  }
-
-  Widget _buildStatusCard({
-    required String status,
-    required String lastUpdated,
-  }) {
-    Color bgColor;
-    Color textColor;
-
-    switch (status) {
-      case "Aman":
-        bgColor = AppColors.bgAman;
-        textColor = AppColors.textAman;
-        break;
-      case "Waspada":
-        bgColor = AppColors.bgWaspada;
-        textColor = AppColors.textWaspada;
-        break;
-      case "Bahaya":
-        bgColor = AppColors.bgBahaya;
-        textColor = AppColors.textBahaya;
-        break;
-      default:
-        bgColor = Colors.grey.shade200;
-        textColor = Colors.black54;
-    }
-
-    return Container(
-      height: 120,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(15),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            status,
-            style: GoogleFonts.quicksand(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: textColor,
-            ),
-          ),
-          const Spacer(),
-          Text(
-            "Diperbarui $lastUpdated",
-            style: GoogleFonts.quicksand(fontSize: 12, color: Colors.black54),
           ),
         ],
       ),
