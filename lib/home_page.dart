@@ -50,7 +50,7 @@ class _HomePageState extends State<HomePage> {
   final int dummyHour = 12;
 
   // --- Variabel Sensor ---
-  double? _waterLevelCm;
+  double? _waterLevel;
   double? _ultrasonic;
   bool _isLoading = true;
   String _lastUpdated = "Menunggu data...";
@@ -64,7 +64,7 @@ class _HomePageState extends State<HomePage> {
         'https://siaga-banjir-b73a8-default-rtdb.asia-southeast1.firebasedatabase.app/',
   ).ref();
 
-  StreamSubscription? _waterLevelSubscription;
+  StreamSubscription? _sensorSubscription;
 
   @override
   void initState() {
@@ -74,7 +74,7 @@ class _HomePageState extends State<HomePage> {
 
   @override
   void dispose() {
-    _waterLevelSubscription?.cancel();
+    _sensorSubscription?.cancel();
     super.dispose();
   }
 
@@ -88,19 +88,27 @@ class _HomePageState extends State<HomePage> {
 
       final dbRef = _database;
 
-      _waterLevelSubscription = dbRef.child('Sensor').onValue.listen((event) {
+      _sensorSubscription = dbRef.child('Sensor').onValue.listen((event) {
         final data = event.snapshot.value;
         print("📡 Data diterima: $data");
 
         if (data != null && data is Map) {
+          double waterLevel = ((data['WaterLevel'] ?? 0) as num).toDouble();
+          double ultrasonic = ((data['Ultrasonic'] ?? 0) as num).toDouble();
+
+          // Ultrasonic aktif hanya jika waterLevel >= 50
+          double ketinggian = (waterLevel >= 50) ? ultrasonic : 0;
+
           setState(() {
-            _ultrasonic = ((data['Ultrasonic'] ?? 0) as num).toDouble();
-            _waterLevelCm =
-                ((data['WaterLevel'] ?? 0) as num).toDouble() / 10.0;
+            _waterLevel = waterLevel;
+            _ultrasonic = ketinggian;
             _lastUpdated = "Baru saja diperbarui";
             _isLoading = false;
           });
-          print("✅ Data diupdate: $_waterLevelCm cm");
+
+          print(
+            "✅ WaterLevel: $_waterLevel cm | Ultrasonic: $_ultrasonic cm (aktif jika >=50)",
+          );
         } else {
           print("⚠️ Data kosong atau format salah");
           setState(() => _isLoading = false);
@@ -125,11 +133,9 @@ class _HomePageState extends State<HomePage> {
 
   String getFloodStatus(double? ultrasonic) {
     if (ultrasonic == null) return "Tidak Diketahui";
-
-    // Semakin besar nilai ultrasonic → air makin tinggi
-    if (ultrasonic >= 100) return "Bahaya"; // di atas 1000 cm → banjir berat
-    if (ultrasonic >= 50) return "Waspada"; // 500–999 cm → siaga
-    return "Aman"; // di bawah 500 cm → normal
+    if (ultrasonic >= 100) return "Bahaya";
+    if (ultrasonic >= 50) return "Waspada";
+    return "Aman";
   }
 
   IconData getArrowIcon(String trend) {
@@ -170,9 +176,8 @@ class _HomePageState extends State<HomePage> {
                         children: [
                           Expanded(
                             child: _buildWaterLevelCard(
-                              level: _ultrasonic != null
-                                  ? "${_ultrasonic!.toStringAsFixed(1)} cm"
-                                  : "-- cm",
+                              level:
+                                  "${_ultrasonic?.toStringAsFixed(1) ?? '--'} cm",
                               trend: currentTrend,
                             ),
                           ),
@@ -189,7 +194,7 @@ class _HomePageState extends State<HomePage> {
               const SizedBox(height: 16),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: CuacaSection(kodeWilayah: "31.71.03.1001"),
+                child: CuacaSection(),
               ),
             ],
           ),
