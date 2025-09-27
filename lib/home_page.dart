@@ -131,10 +131,16 @@ class _HomePageState extends State<HomePage> {
     return trend;
   }
 
-  String getFloodStatus(double? ultrasonic) {
-    if (ultrasonic == null) return "Tidak Diketahui";
-    if (ultrasonic >= 100) return "Bahaya";
-    if (ultrasonic >= 50) return "Waspada";
+  String getFloodStatus(double? ultrasonic, double? waterLevel) {
+    if (ultrasonic == null || waterLevel == null) return "Tidak Diketahui";
+
+    // 🔹 Kalau waterLevel masih < 100 → tetap Aman
+    if (waterLevel < 100) return "Aman";
+
+    // 🔹 Kalau waterLevel >= 100 baru cek ultrasonic
+    if (ultrasonic <= 50) return "Bahaya";
+    if (ultrasonic > 50) return "Waspada";
+
     return "Aman";
   }
 
@@ -149,10 +155,22 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  double getResponsiveSize(
+    BuildContext context,
+    double small,
+    double medium,
+    double large,
+  ) {
+    final width = MediaQuery.of(context).size.width;
+    if (width <= 320) return small;
+    if (width <= 480) return medium;
+    return large;
+  }
+
   @override
   Widget build(BuildContext context) {
     final String currentTrend = getTrend(_ultrasonic);
-    final String currentStatus = getFloodStatus(_ultrasonic);
+    final String currentStatus = getFloodStatus(_ultrasonic, _waterLevel);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
@@ -194,7 +212,8 @@ class _HomePageState extends State<HomePage> {
               const SizedBox(height: 16),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: CuacaSection(),
+                // child: CuacaSection(), // Openweathermap
+                child: CuacaSection(kodeWilayah: "31.71.03.1001"),
               ),
             ],
           ),
@@ -233,27 +252,51 @@ class _HomePageState extends State<HomePage> {
         children: [
           Text(
             "Ketinggian Air,",
-            style: GoogleFonts.quicksand(fontSize: 14, color: Colors.black54),
+            style: GoogleFonts.quicksand(
+              fontSize: getResponsiveSize(context, 12, 14, 16),
+              color: Colors.black54,
+            ),
           ),
           const SizedBox(height: 8),
           Row(
             children: [
-              Text(
-                level,
-                style: GoogleFonts.quicksand(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.text,
+              Expanded(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    level,
+                    overflow:
+                        TextOverflow.ellipsis, // ⬅️ biar angka panjang dipotong
+                    style: GoogleFonts.quicksand(
+                      fontSize: getResponsiveSize(context, 22, 24, 26),
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.text,
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(width: 6),
-              Icon(getArrowIcon(trend), size: 16, color: AppColors.text),
+              Icon(
+                getArrowIcon(trend),
+                size: getResponsiveSize(
+                  context,
+                  14,
+                  16,
+                  18,
+                ), // ⬅️ ikut responsive
+                color: AppColors.text,
+              ),
             ],
           ),
+
           const Spacer(),
           Text(
             "Tren air: $trend",
-            style: GoogleFonts.quicksand(fontSize: 12, color: Colors.black45),
+            style: GoogleFonts.quicksand(
+              fontSize: getResponsiveSize(context, 10, 12, 14),
+              color: Colors.black45,
+            ),
           ),
         ],
       ),
@@ -296,7 +339,7 @@ class _HomePageState extends State<HomePage> {
           Text(
             status,
             style: GoogleFonts.quicksand(
-              fontSize: 24,
+              fontSize: getResponsiveSize(context, 22, 24, 26),
               fontWeight: FontWeight.bold,
               color: textColor,
             ),
@@ -304,7 +347,10 @@ class _HomePageState extends State<HomePage> {
           const Spacer(),
           Text(
             "Diperbarui $lastUpdated",
-            style: GoogleFonts.quicksand(fontSize: 12, color: Colors.black54),
+            style: GoogleFonts.quicksand(
+              fontSize: getResponsiveSize(context, 10, 12, 14),
+              color: Colors.black54,
+            ),
           ),
         ],
       ),
@@ -351,14 +397,14 @@ class _HomePageState extends State<HomePage> {
                     'Selamat datang di',
                     style: GoogleFonts.quicksand(
                       color: Colors.white70,
-                      fontSize: 14,
+                      fontSize: getResponsiveSize(context, 12, 14, 16),
                     ),
                   ),
                   Text(
                     'Siaga Banjir',
                     style: GoogleFonts.poppins(
                       color: Colors.white,
-                      fontSize: 14,
+                      fontSize: getResponsiveSize(context, 12, 14, 16),
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -369,7 +415,10 @@ class _HomePageState extends State<HomePage> {
           const SizedBox(height: 24),
           Text(
             'Lokasi',
-            style: GoogleFonts.quicksand(color: Colors.white70, fontSize: 14),
+            style: GoogleFonts.quicksand(
+              color: Colors.white70,
+              fontSize: getResponsiveSize(context, 12, 14, 16),
+            ),
           ),
           Row(
             children: [
@@ -377,7 +426,7 @@ class _HomePageState extends State<HomePage> {
                 _locationName,
                 style: GoogleFonts.quicksand(
                   color: Colors.white,
-                  fontSize: 16,
+                  fontSize: getResponsiveSize(context, 14, 16, 18),
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -398,7 +447,7 @@ class _HomePageState extends State<HomePage> {
                   style: GoogleFonts.quicksand(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
-                    fontSize: 12,
+                    fontSize: getResponsiveSize(context, 10, 12, 14),
                   ),
                 ),
               ),
@@ -468,7 +517,12 @@ class _HomePageState extends State<HomePage> {
       child: Stack(
         children: [
           Padding(
-            padding: const EdgeInsets.all(16.0),
+            padding: const EdgeInsets.only(
+              left: 16.0,
+              right: 16.0,
+              bottom: 16.0,
+              top: 10.0,
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -476,15 +530,21 @@ class _HomePageState extends State<HomePage> {
                   title,
                   style: GoogleFonts.quicksand(
                     color: AppColors.text,
-                    fontSize: 14,
+                    fontSize: getResponsiveSize(context, 12, 14, 16),
                   ),
                 ),
-                Text(
-                  value,
-                  style: GoogleFonts.quicksand(
-                    color: valueColor,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
+                const SizedBox(height: 4),
+                SizedBox(
+                  width: 80,
+                  child: Text(
+                    value,
+                    softWrap: true,
+                    overflow: TextOverflow.visible,
+                    style: GoogleFonts.quicksand(
+                      color: valueColor,
+                      fontSize: getResponsiveSize(context, 16, 18, 20),
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ],

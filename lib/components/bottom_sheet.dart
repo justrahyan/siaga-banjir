@@ -15,113 +15,118 @@ void showDeviceDetail(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
     builder: (context) {
-      return Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              margin: const EdgeInsets.only(bottom: 16),
-              decoration: BoxDecoration(
-                color: Colors.grey[300],
-                borderRadius: BorderRadius.circular(2),
+      return SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
-            ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    const Icon(Icons.wifi, size: 20, color: AppColors.text),
-                    const SizedBox(width: 6),
-                    Text(
-                      connectionStatus,
-                      style: GoogleFonts.quicksand(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: connectionStatus.toLowerCase() == "online"
-                            ? Colors.green
-                            : Colors.red,
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.wifi, size: 20, color: AppColors.text),
+                      const SizedBox(width: 6),
+                      Text(
+                        connectionStatus,
+                        style: GoogleFonts.quicksand(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: connectionStatus.toLowerCase() == "online"
+                              ? Colors.green
+                              : Colors.red,
+                        ),
                       ),
+                    ],
+                  ),
+                  _BatteryIndicator(batteryPercentage: batteryPercentage),
+                ],
+              ),
+              const SizedBox(height: 16),
+              // gambar device
+              Center(
+                child: Image.asset(
+                  'assets/images/internet.png',
+                  width: 120,
+                  height: 120,
+                ),
+              ),
+              const SizedBox(height: 16),
+              // judul
+              Text(
+                "Alat Pemantau",
+                style: GoogleFonts.quicksand(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                ),
+              ),
+              const SizedBox(height: 8),
+              // deskripsi
+              Text(
+                "Detail informasi alat pemantau banjir",
+                textAlign: TextAlign.center,
+                style: GoogleFonts.quicksand(
+                  fontSize: 14,
+                  color: Colors.black54,
+                ),
+              ),
+              const SizedBox(height: 16),
+              // sumber daya
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    powerSource.toLowerCase() == "solar panel"
+                        ? Icons.solar_power
+                        : Icons.battery_charging_full,
+                    size: 20,
+                    color: Colors.orangeAccent,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    powerSource,
+                    style: GoogleFonts.quicksand(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.text,
                     ),
-                  ],
-                ),
-                _BatteryIndicator(batteryPercentage: batteryPercentage),
-              ],
-            ),
-            const SizedBox(height: 16),
-            // gambar device
-            Center(
-              child: Image.asset(
-                'assets/images/internet.png',
-                width: 120,
-                height: 120,
-              ),
-            ),
-            const SizedBox(height: 16),
-            // judul
-            Text(
-              "Alat Pemantau",
-              style: GoogleFonts.quicksand(
-                fontWeight: FontWeight.bold,
-                fontSize: 18,
-              ),
-            ),
-            const SizedBox(height: 8),
-            // deskripsi
-            Text(
-              "Detail informasi alat pemantau banjir",
-              textAlign: TextAlign.center,
-              style: GoogleFonts.quicksand(fontSize: 14, color: Colors.black54),
-            ),
-            const SizedBox(height: 16),
-            // sumber daya
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  powerSource.toLowerCase() == "solar panel"
-                      ? Icons.solar_power
-                      : Icons.battery_charging_full,
-                  size: 20,
-                  color: Colors.orangeAccent,
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  powerSource,
-                  style: GoogleFonts.quicksand(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.text,
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            // tombol
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                ],
+              ),
+              const SizedBox(height: 24),
+              // tombol
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
-                ),
-                onPressed: () => Navigator.pop(context),
-                child: Text(
-                  "Tutup",
-                  style: GoogleFonts.quicksand(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
+                  onPressed: () => Navigator.pop(context),
+                  child: Text(
+                    "Tutup",
+                    style: GoogleFonts.quicksand(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       );
     },

@@ -116,6 +116,18 @@ class PanduanPage extends StatelessWidget {
     );
   }
 
+  double getResponsiveSize(
+    BuildContext context,
+    double small,
+    double medium,
+    double large,
+  ) {
+    final width = MediaQuery.of(context).size.width;
+    if (width <= 320) return small;
+    if (width <= 480) return medium;
+    return large;
+  }
+
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(

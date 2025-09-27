@@ -123,9 +123,9 @@ class CuacaCard extends StatelessWidget {
 }
 
 class CuacaSection extends StatefulWidget {
-  // final String kodeWilayah;
-  // const CuacaSection({super.key, required this.kodeWilayah});
-  const CuacaSection({super.key});
+  final String kodeWilayah;
+  const CuacaSection({super.key, required this.kodeWilayah});
+  // const CuacaSection({super.key});
 
   @override
   State<CuacaSection> createState() => _CuacaSectionState();
@@ -154,8 +154,8 @@ class _CuacaSectionState extends State<CuacaSection> {
     // final url =
     //     "https://api.bmkg.go.id/publik/prakiraan-cuaca?adm4=${widget.kodeWilayah}";
     print("URL: $url");
-    print("Latitude:" + lat.toString());
-    print("Longitude:" + lon.toString());
+    // print("Latitude:" + lat.toString());
+    // print("Longitude:" + lon.toString());
 
     try {
       final res = await http.get(Uri.parse(url));
@@ -176,7 +176,7 @@ class _CuacaSectionState extends State<CuacaSection> {
         }
         setState(() {
           cuaca = data;
-          // prakiraan = extracted;
+          prakiraan = extracted;
         });
       } else {
         print("❌ Error: ${res.body}");
@@ -306,7 +306,7 @@ class _CuacaSectionState extends State<CuacaSection> {
                 // ),
                 // SizedBox(width: 8),
                 // Text(
-                //   'Badan Meteorologi, Klimatologi, dan Geofisika',
+                //   'BMKG',
                 //   style: GoogleFonts.quicksand(
                 //     fontSize: 12,
                 //     fontWeight: FontWeight.w600,
@@ -316,6 +316,7 @@ class _CuacaSectionState extends State<CuacaSection> {
             ),
           ],
         ),
+        SizedBox(height: 12),
       ],
     );
   }

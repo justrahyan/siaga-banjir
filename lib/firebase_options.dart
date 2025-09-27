@@ -85,5 +85,4 @@ class DefaultFirebaseOptions {
     storageBucket: 'siaga-banjir-b73a8.firebasestorage.app',
     measurementId: 'G-G9R9CTPC00',
   );
-
 }
