@@ -96,6 +96,8 @@ class _HomePageState extends State<HomePage> {
           double waterLevel = ((data['WaterLevel'] ?? 0) as num).toDouble();
           double ultrasonic = ((data['Ultrasonic'] ?? 0) as num).toDouble();
 
+          if (ultrasonic < 0) ultrasonic = 0;
+
           // Ultrasonic aktif hanya jika waterLevel >= 50
           double ketinggian = (waterLevel >= 50) ? ultrasonic : 0;
 
@@ -134,14 +136,22 @@ class _HomePageState extends State<HomePage> {
   String getFloodStatus(double? ultrasonic, double? waterLevel) {
     if (ultrasonic == null || waterLevel == null) return "Tidak Diketahui";
 
-    // 🔹 Kalau waterLevel masih < 100 → tetap Aman
-    if (waterLevel < 100) return "Aman";
+    // 🔹 Jika waterLevel < 100 → sensor ultrasonic belum dipakai
+    if (waterLevel < 100) {
+      ultrasonic = 0;
+      return "Aman";
+    }
 
-    // 🔹 Kalau waterLevel >= 100 baru cek ultrasonic
-    if (ultrasonic <= 50) return "Bahaya";
-    if (ultrasonic > 50) return "Waspada";
+    // 🔹 Jika waterLevel >= 100 → cek ultrasonic
+    if (ultrasonic >= 0 && ultrasonic <= 30) {
+      return "Aman";
+    } else if (ultrasonic > 30 && ultrasonic <= 70) {
+      return "Waspada";
+    } else if (ultrasonic > 70) {
+      return "Bahaya";
+    }
 
-    return "Aman";
+    return "Tidak Diketahui";
   }
 
   IconData getArrowIcon(String trend) {
