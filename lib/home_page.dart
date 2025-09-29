@@ -223,7 +223,7 @@ class _HomePageState extends State<HomePage> {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0),
                 // child: CuacaSection(), // Openweathermap
-                child: CuacaSection(kodeWilayah: "31.71.03.1001"),
+                child: CuacaSection(),
               ),
             ],
           ),

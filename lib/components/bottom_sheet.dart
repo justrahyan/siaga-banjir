@@ -56,7 +56,7 @@ void showDeviceDetail(
               // gambar device
               Center(
                 child: Image.asset(
-                  'assets/images/internet.png',
+                  'assets/images/prototype.png',
                   width: 120,
                   height: 120,
                 ),

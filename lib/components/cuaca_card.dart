@@ -123,9 +123,9 @@ class CuacaCard extends StatelessWidget {
 }
 
 class CuacaSection extends StatefulWidget {
-  final String kodeWilayah;
-  const CuacaSection({super.key, required this.kodeWilayah});
-  // const CuacaSection({super.key});
+  // final String kodeWilayah;
+  // const CuacaSection({super.key, required this.kodeWilayah});
+  const CuacaSection({super.key});
 
   @override
   State<CuacaSection> createState() => _CuacaSectionState();
