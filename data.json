@@ -1,0 +1,30 @@
+{
+  "Alat": {
+    "alat1": {
+      "nama_alat": "SiTanda 1",
+      "koneksi": true,
+      "daya": true,
+      "koordinat": {
+        "latitude": -5.167811,
+        "longitude": 119.433467
+      },
+      "Sensor": {
+        "WaterLevel": 500,
+        "Ultrasonic": 50
+      }
+    },
+    "alat2": {
+      "nama_alat": "SiTanda 2",
+      "koneksi": true,
+      "daya": false,
+      "koordinat": {
+        "latitude": -5.1456,
+        "longitude": 119.4203
+      },
+      "Sensor": {
+        "WaterLevel": 300,
+        "Ultrasonic": 65
+      }
+    }
+  }
+}

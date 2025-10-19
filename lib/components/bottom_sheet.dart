@@ -7,6 +7,7 @@ void showDeviceDetail(
   required String connectionStatus,
   required String powerSource,
   required int batteryPercentage,
+  required String deviceName,
 }) {
   showModalBottomSheet(
     context: context,
@@ -49,7 +50,8 @@ void showDeviceDetail(
                       ),
                     ],
                   ),
-                  _BatteryIndicator(batteryPercentage: batteryPercentage),
+                  if (powerSource.toLowerCase() == "baterai")
+                    _BatteryIndicator(batteryPercentage: batteryPercentage),
                 ],
               ),
               const SizedBox(height: 16),
@@ -64,7 +66,7 @@ void showDeviceDetail(
               const SizedBox(height: 16),
               // judul
               Text(
-                "Alat Pemantau",
+                deviceName,
                 style: GoogleFonts.quicksand(
                   fontWeight: FontWeight.bold,
                   fontSize: 18,

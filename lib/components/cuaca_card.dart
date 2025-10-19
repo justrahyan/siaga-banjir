@@ -123,9 +123,9 @@ class CuacaCard extends StatelessWidget {
 }
 
 class CuacaSection extends StatefulWidget {
-  // final String kodeWilayah;
-  // const CuacaSection({super.key, required this.kodeWilayah});
-  const CuacaSection({super.key});
+  final String kodeWilayah;
+  const CuacaSection({super.key, required this.kodeWilayah});
+  // const CuacaSection({super.key});
 
   @override
   State<CuacaSection> createState() => _CuacaSectionState();
@@ -138,21 +138,21 @@ class _CuacaSectionState extends State<CuacaSection> {
   @override
   void initState() {
     super.initState();
-    getCurrentLocation().then((pos) {
-      fetchCuaca(pos.latitude, pos.longitude);
-    });
+    // getCurrentLocation().then((pos) {
+    //   fetchCuaca(pos.latitude, pos.longitude);
+    // });
     // fetchCuaca(-5.167971, 119.433536);
-    // fetchCuaca();
+    fetchCuaca();
   }
 
   // double lat, double lon utk argumen fetchCuaca
-  Future<void> fetchCuaca(double lat, double lon) async {
+  Future<void> fetchCuaca() async {
     const apiKey = "bb2dd84ca2541574dac0faffefcb4e45";
-    final url =
-        "https://api.openweathermap.org/data/2.5/weather?lat=$lat&lon=$lon&appid=$apiKey&units=metric&lang=id";
-
     // final url =
-    //     "https://api.bmkg.go.id/publik/prakiraan-cuaca?adm4=${widget.kodeWilayah}";
+    //     "https://api.openweathermap.org/data/2.5/weather?lat=$lat&lon=$lon&appid=$apiKey&units=metric&lang=id";
+
+    final url =
+        "https://api.bmkg.go.id/publik/prakiraan-cuaca?adm4=${widget.kodeWilayah}";
     print("URL: $url");
     // print("Latitude:" + lat.toString());
     // print("Longitude:" + lon.toString());
@@ -214,68 +214,68 @@ class _CuacaSectionState extends State<CuacaSection> {
           ),
         ),
         const SizedBox(height: 8),
-        SizedBox(
-          height: 200,
-          child: cuaca == null
-              ? const Center(
-                  child: Column(
-                    children: [
-                      CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation(AppColors.primary),
-                      ),
-                      SizedBox(height: 12),
-                      Text(
-                        "Memuat data cuaca...",
-                        style: TextStyle(color: AppColors.text, fontSize: 12),
-                      ),
-                    ],
-                  ),
-                )
-              : PageView(
-                  controller: PageController(viewportFraction: 0.95),
-                  children: [
-                    CuacaCard(
-                      icon: getIconUrl(cuaca!["weather"][0]["icon"]),
-                      suhu: cuaca!["main"]["temp"].toString(),
-                      kondisi: cuaca!["weather"][0]["description"],
-                      angin: "${cuaca!["wind"]["speed"]} m/s",
-                      kelembapan: cuaca!["main"]["humidity"].toString(),
-                      waktu: DateFormat(
-                        "dd MMMM yyyy",
-                        "id_ID",
-                      ).format(DateTime.now()),
-                      isToday: true,
-                    ),
-                  ],
-                ),
-        ),
         // SizedBox(
         //   height: 200,
-        //   child: prakiraan.isEmpty
+        //   child: cuaca == null
         //       ? const Center(
-        //           child: CircularProgressIndicator(
-        //             valueColor: AlwaysStoppedAnimation(AppColors.primary),
+        //           child: Column(
+        //             children: [
+        //               CircularProgressIndicator(
+        //                 valueColor: AlwaysStoppedAnimation(AppColors.primary),
+        //               ),
+        //               SizedBox(height: 12),
+        //               Text(
+        //                 "Memuat data cuaca...",
+        //                 style: TextStyle(color: AppColors.text, fontSize: 12),
+        //               ),
+        //             ],
         //           ),
         //         )
-        //       : PageView.builder(
+        //       : PageView(
         //           controller: PageController(viewportFraction: 0.95),
-        //           itemCount: prakiraan.length,
-        //           itemBuilder: (context, index) {
-        //             final item = prakiraan[index];
-        //             final waktu = item["local_datetime"].toString();
-
-        //             return CuacaCard(
-        //               icon: getIcon(item["weather_desc"] ?? ""),
-        //               suhu: item["t"].toString(),
-        //               kondisi: item["weather_desc"] ?? "",
-        //               angin: "${item["ws"]} km/h",
-        //               kelembapan: item["hu"].toString(),
-        //               waktu: waktu,
-        //               isToday: index == 0, // card pertama dianggap hari ini
-        //             );
-        //           },
+        //           children: [
+        //             CuacaCard(
+        //               icon: getIconUrl(cuaca!["weather"][0]["icon"]),
+        //               suhu: cuaca!["main"]["temp"].toString(),
+        //               kondisi: cuaca!["weather"][0]["description"],
+        //               angin: "${cuaca!["wind"]["speed"]} m/s",
+        //               kelembapan: cuaca!["main"]["humidity"].toString(),
+        //               waktu: DateFormat(
+        //                 "dd MMMM yyyy",
+        //                 "id_ID",
+        //               ).format(DateTime.now()),
+        //               isToday: true,
+        //             ),
+        //           ],
         //         ),
         // ),
+        SizedBox(
+          height: 200,
+          child: prakiraan.isEmpty
+              ? const Center(
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation(AppColors.primary),
+                  ),
+                )
+              : PageView.builder(
+                  controller: PageController(viewportFraction: 0.95),
+                  itemCount: prakiraan.length,
+                  itemBuilder: (context, index) {
+                    final item = prakiraan[index];
+                    final waktu = item["local_datetime"].toString();
+
+                    return CuacaCard(
+                      icon: getIcon(item["weather_desc"] ?? ""),
+                      suhu: item["t"].toString(),
+                      kondisi: item["weather_desc"] ?? "",
+                      angin: "${item["ws"]} km/h",
+                      kelembapan: item["hu"].toString(),
+                      waktu: waktu,
+                      isToday: index == 0, // card pertama dianggap hari ini
+                    );
+                  },
+                ),
+        ),
         const SizedBox(height: 16),
         Row(
           children: [
@@ -286,32 +286,32 @@ class _CuacaSectionState extends State<CuacaSection> {
             const SizedBox(width: 4),
             Row(
               children: [
-                SizedBox(
-                  height: 24,
-                  child: Image.asset(
-                    "assets/images/logo/logo-openweathermap.png",
-                  ),
-                ),
-                SizedBox(width: 8),
-                Text(
-                  'Open Weather Map',
-                  style: GoogleFonts.quicksand(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
                 // SizedBox(
                 //   height: 24,
-                //   child: Image.asset("assets/images/logo/logo-bmkg.png"),
+                //   child: Image.asset(
+                //     "assets/images/logo/logo-openweathermap.png",
+                //   ),
                 // ),
                 // SizedBox(width: 8),
                 // Text(
-                //   'BMKG',
+                //   'Open Weather Map',
                 //   style: GoogleFonts.quicksand(
                 //     fontSize: 12,
                 //     fontWeight: FontWeight.w600,
                 //   ),
                 // ),
+                SizedBox(
+                  height: 24,
+                  child: Image.asset("assets/images/logo/logo-bmkg.png"),
+                ),
+                SizedBox(width: 8),
+                Text(
+                  'BMKG',
+                  style: GoogleFonts.quicksand(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ],
             ),
           ],

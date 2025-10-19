@@ -11,4 +11,5 @@ class AppColors {
   static const Color textAman = Color(0xFF00796B);
   static const Color textWaspada = Color(0xFFEDB82F);
   static const Color textBahaya = Color(0xFFC62828);
+  static const Color orange = Color(0xFFFFA726);
 }

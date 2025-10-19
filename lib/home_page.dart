@@ -1,15 +1,14 @@
 import 'dart:async';
-import 'dart:convert';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
-import 'package:http/http.dart' as http;
 import 'package:siaga_banjir/components/bottom_sheet.dart';
 import 'package:siaga_banjir/components/cuaca_card.dart';
 import 'package:siaga_banjir/themes/colors.dart';
+import 'package:intl/intl.dart';
 
 // 🛰️ Ambil lokasi pengguna
 Future<Position> getCurrentLocation() async {
@@ -44,19 +43,6 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  final String _locationName = 'Jembatan Kembar Gowa';
-  final String _connectionStatus = 'Online';
-  final int _batteryPercentage = 43;
-  final int dummyHour = 12;
-
-  // --- Variabel Sensor ---
-  double? _waterLevel;
-  double? _ultrasonic;
-  bool _isLoading = true;
-  String _lastUpdated = "Menunggu data...";
-  double? _previousWaterLevel;
-
-  // --- Firebase ---
   final _auth = FirebaseAuth.instance;
   final _database = FirebaseDatabase.instanceFor(
     app: Firebase.app(),
@@ -64,7 +50,20 @@ class _HomePageState extends State<HomePage> {
         'https://siaga-banjir-b73a8-default-rtdb.asia-southeast1.firebasedatabase.app/',
   ).ref();
 
-  StreamSubscription? _sensorSubscription;
+  StreamSubscription? _alatSubscription;
+
+  // === Variabel Data ===
+  final Map<String, String> _deviceList = {};
+  String? _selectedDeviceKey;
+  String? _deviceName;
+  bool? _connectionStatus;
+  bool? _isSolarPower;
+  double? _waterLevel;
+  double? _ultrasonic;
+  double? _previousWaterLevel;
+  String _lastUpdated = "Menunggu data...";
+  bool _isLoading = true;
+  int _batteryPercentage = 100;
 
   @override
   void initState() {
@@ -74,54 +73,146 @@ class _HomePageState extends State<HomePage> {
 
   @override
   void dispose() {
-    _sensorSubscription?.cancel();
+    _alatSubscription?.cancel();
     super.dispose();
   }
 
   Future<void> _initializeFirebase() async {
     try {
-      await _auth.signInWithEmailAndPassword(
-        email: 'admin@gmail.com',
-        password: 'admin123',
-      );
+      // 1. Login (Sama seperti sebelumnya)
+      if (_auth.currentUser == null) {
+        await _auth.signInWithEmailAndPassword(
+          email: 'admin@gmail.com',
+          password: 'admin123',
+        );
+      }
       print("✅ Firebase login berhasil");
 
-      final dbRef = _database;
+      // 2. Ambil DAFTAR SEMUA ALAT (hanya sekali)
+      final deviceListSnapshot = await _database.child('Alat').once();
+      if (deviceListSnapshot.snapshot.value == null) {
+        print("❌ Tidak ada data 'Alat' ditemukan");
+        if (mounted) setState(() => _isLoading = false);
+        return;
+      }
 
-      _sensorSubscription = dbRef.child('Sensor').onValue.listen((event) {
-        final data = event.snapshot.value;
-        print("📡 Data diterima: $data");
-
-        if (data != null && data is Map) {
-          double waterLevel = ((data['WaterLevel'] ?? 0) as num).toDouble();
-          double ultrasonic = ((data['Ultrasonic'] ?? 0) as num).toDouble();
-
-          if (ultrasonic < 0) ultrasonic = 0;
-
-          // Ultrasonic aktif hanya jika waterLevel >= 50
-          double ketinggian = (waterLevel >= 50) ? ultrasonic : 0;
-
-          setState(() {
-            _waterLevel = waterLevel;
-            _ultrasonic = ketinggian;
-            _lastUpdated = "Baru saja diperbarui";
-            _isLoading = false;
-          });
-
-          print(
-            "✅ WaterLevel: $_waterLevel cm | Ultrasonic: $_ultrasonic cm (aktif jika >=50)",
-          );
-        } else {
-          print("⚠️ Data kosong atau format salah");
-          setState(() => _isLoading = false);
+      // 3. Proses daftar alat
+      final allAlatData = Map<String, dynamic>.from(
+        deviceListSnapshot.snapshot.value as Map,
+      );
+      _deviceList.clear();
+      allAlatData.forEach((key, value) {
+        final alatData = Map<String, dynamic>.from(value);
+        final namaAlat = alatData['nama_alat'] as String?;
+        if (namaAlat != null) {
+          _deviceList[key] = namaAlat; // key: "alat1", value: "SiTanda"
         }
       });
+
+      if (_deviceList.isEmpty) {
+        print("❌ Tidak ada alat yang memiliki 'nama_alat'");
+        if (mounted) setState(() => _isLoading = false);
+        return;
+      }
+
+      // 4. Set alat pertama sebagai default
+      setState(() {
+        _selectedDeviceKey = _deviceList.keys.first;
+        _isLoading = true; // Set loading true untuk ambil data alat pertama
+      });
+
+      // 5. Mulai dengarkan data alat yang dipilih
+      _listenToDevice(_selectedDeviceKey!);
     } catch (e) {
       print("❌ Firebase error: $e");
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
+  void _listenToDevice(String deviceKey) {
+    // Hentikan listener lama
+    _alatSubscription?.cancel();
+    print("🎧 Mulai mendengarkan data untuk $deviceKey...");
+
+    _alatSubscription = _database
+        .child('Alat/$deviceKey')
+        .onValue
+        .listen(
+          (event) {
+            final data = event.snapshot.value as Map?;
+            if (data == null) {
+              if (mounted) setState(() => _isLoading = false);
+              return;
+            }
+
+            final sensor = data['Sensor'] as Map?;
+            final double waterLevel = ((sensor?['WaterLevel'] ?? 0) as num)
+                .toDouble();
+            final double ultrasonic = ((sensor?['Ultrasonic'] ?? 0) as num)
+                .toDouble();
+
+            final now = DateTime.now();
+            final currentTime = DateFormat('HH:mm').format(now);
+            final bool isSolar = _checkSolarTime(currentTime);
+
+            final dynamic koneksiData = data['koneksi'];
+            final bool isKoneksiOn =
+                (koneksiData == true || koneksiData == 'true');
+            if (mounted) {
+              setState(() {
+                _deviceName = data['nama_alat'];
+                _connectionStatus = isKoneksiOn;
+                _isSolarPower = isSolar;
+                _waterLevel = waterLevel;
+                _ultrasonic = ultrasonic;
+                _batteryPercentage = getBatteryLevel();
+                _lastUpdated = "Baru saja diperbarui";
+                _isLoading = false;
+              });
+            }
+          },
+          onError: (error) {
+            print("❌ Error mendengarkan $deviceKey: $error");
+            if (mounted) setState(() => _isLoading = false);
+          },
+        );
+  }
+
+  // 🔆 Cek waktu untuk sumber daya
+  bool _checkSolarTime(String currentTime) {
+    final now = DateTime.now();
+    final morning = DateTime(now.year, now.month, now.day, 6, 30);
+    final evening = DateTime(now.year, now.month, now.day, 18, 0);
+    return now.isAfter(morning) && now.isBefore(evening);
+  }
+
+  // 🔋 Hitung level baterai (malam berkurang tiap jam)
+  int getBatteryLevel() {
+    final now = DateTime.now();
+    final morning = DateTime(now.year, now.month, now.day, 6, 30);
+    final evening = DateTime(now.year, now.month, now.day, 18, 1);
+    if (now.isAfter(evening) || now.isBefore(morning)) {
+      DateTime startDischarge = now.isAfter(evening)
+          ? evening
+          : DateTime(now.year, now.month, now.day - 1, 18, 1);
+      int hoursPassed = now.difference(startDischarge).inHours;
+      int percentage = 100 - (hoursPassed * 5);
+      return percentage.clamp(0, 100);
+    } else {
+      return 100;
+    }
+  }
+
+  // 🌊 Status banjir berdasarkan sensor
+  String getFloodStatus(double? ultrasonic, double? waterLevel) {
+    if (ultrasonic == null || waterLevel == null) return "Tidak Diketahui";
+    if (waterLevel < 100) return "Aman";
+    if (ultrasonic <= 30) return "Aman";
+    if (ultrasonic <= 70) return "Waspada";
+    return "Bahaya";
+  }
+
+  // 📈 Cek tren air
   String getTrend(double? currentLevel) {
     if (currentLevel == null) return "stabil";
     String trend = "stabil";
@@ -131,27 +222,6 @@ class _HomePageState extends State<HomePage> {
     }
     _previousWaterLevel = currentLevel;
     return trend;
-  }
-
-  String getFloodStatus(double? ultrasonic, double? waterLevel) {
-    if (ultrasonic == null || waterLevel == null) return "Tidak Diketahui";
-
-    // 🔹 Jika waterLevel < 100 → sensor ultrasonic belum dipakai
-    if (waterLevel < 100) {
-      ultrasonic = 0;
-      return "Aman";
-    }
-
-    // 🔹 Jika waterLevel >= 100 → cek ultrasonic
-    if (ultrasonic >= 0 && ultrasonic <= 30) {
-      return "Aman";
-    } else if (ultrasonic > 30 && ultrasonic <= 70) {
-      return "Waspada";
-    } else if (ultrasonic > 70) {
-      return "Bahaya";
-    }
-
-    return "Tidak Diketahui";
   }
 
   IconData getArrowIcon(String trend) {
@@ -165,6 +235,7 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  // 📱 Responsive ukuran font
   double getResponsiveSize(
     BuildContext context,
     double small,
@@ -220,10 +291,9 @@ class _HomePageState extends State<HomePage> {
                       ),
               ),
               const SizedBox(height: 16),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                // child: CuacaSection(), // Openweathermap
-                child: CuacaSection(),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16.0),
+                child: CuacaSection(kodeWilayah: "31.71.03.1001"),
               ),
             ],
           ),
@@ -246,6 +316,7 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  // 💧 Card Ketinggian Air
   Widget _buildWaterLevelCard({required String level, required String trend}) {
     return Container(
       height: 120,
@@ -276,8 +347,6 @@ class _HomePageState extends State<HomePage> {
                   alignment: Alignment.centerLeft,
                   child: Text(
                     level,
-                    overflow:
-                        TextOverflow.ellipsis, // ⬅️ biar angka panjang dipotong
                     style: GoogleFonts.quicksand(
                       fontSize: getResponsiveSize(context, 22, 24, 26),
                       fontWeight: FontWeight.bold,
@@ -289,17 +358,11 @@ class _HomePageState extends State<HomePage> {
               const SizedBox(width: 6),
               Icon(
                 getArrowIcon(trend),
-                size: getResponsiveSize(
-                  context,
-                  14,
-                  16,
-                  18,
-                ), // ⬅️ ikut responsive
+                size: getResponsiveSize(context, 14, 16, 18),
                 color: AppColors.text,
               ),
             ],
           ),
-
           const Spacer(),
           Text(
             "Tren air: $trend",
@@ -313,6 +376,7 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  // 🌧️ Card Status Banjir
   Widget _buildStatusCard({
     required String status,
     required String lastUpdated,
@@ -367,11 +431,12 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  // 🧭 Header Utama
   Widget _buildHeader() {
-    final String _powerSource = dummyHour >= 6 && dummyHour < 18
+    final String _powerSource = _isSolarPower == true
         ? 'Solar Panel'
         : 'Baterai';
-    final String _powerImage = dummyHour >= 6 && dummyHour < 18
+    final String _powerImage = _isSolarPower == true
         ? 'assets/images/solar-panel.png'
         : 'assets/images/battery.png';
 
@@ -407,14 +472,13 @@ class _HomePageState extends State<HomePage> {
                     'Selamat datang di',
                     style: GoogleFonts.quicksand(
                       color: Colors.white70,
-                      fontSize: getResponsiveSize(context, 12, 14, 16),
+                      fontSize: 14,
                     ),
                   ),
                   Text(
                     'Siaga Banjir',
                     style: GoogleFonts.poppins(
                       color: Colors.white,
-                      fontSize: getResponsiveSize(context, 12, 14, 16),
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -424,43 +488,95 @@ class _HomePageState extends State<HomePage> {
           ),
           const SizedBox(height: 24),
           Text(
-            'Lokasi',
-            style: GoogleFonts.quicksand(
-              color: Colors.white70,
-              fontSize: getResponsiveSize(context, 12, 14, 16),
-            ),
+            'Nama Alat',
+            style: GoogleFonts.quicksand(color: Colors.white70),
           ),
           Row(
             children: [
-              Text(
-                _locationName,
-                style: GoogleFonts.quicksand(
+              if (_deviceList.isNotEmpty && _selectedDeviceKey != null)
+                PopupMenuButton<String>(
+                  // Ini adalah tampilan widget (Teks + Ikon)
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        // Tampilkan nama alat yg dipilih, atau "Memuat..."
+                        _deviceName ??
+                            _deviceList[_selectedDeviceKey] ??
+                            'Memuat...',
+                        style: GoogleFonts.quicksand(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      const Icon(Icons.arrow_drop_down, color: Colors.white),
+                    ],
+                  ),
+                  // Ini adalah daftar item di menu dropdown
+                  itemBuilder: (BuildContext context) {
+                    return _deviceList.entries.map((entry) {
+                      return PopupMenuItem<String>(
+                        value: entry.key, // "alat1"
+                        child: Text(
+                          entry.value, // "SiTanda"
+                          style: GoogleFonts.quicksand(),
+                        ),
+                      );
+                    }).toList();
+                  },
+                  // Aksi saat item dipilih
+                  onSelected: (String newKey) {
+                    if (newKey != _selectedDeviceKey) {
+                      setState(() {
+                        _isLoading = true; // Tampilkan loading
+                        _selectedDeviceKey = newKey;
+                        // Kosongkan data lama
+                        _deviceName = null;
+                        _connectionStatus = null;
+                        _waterLevel = null;
+                        _ultrasonic = null;
+                      });
+                      // Panggil listener untuk alat yang baru dipilih
+                      _listenToDevice(newKey);
+                    }
+                  },
                   color: Colors.white,
-                  fontSize: getResponsiveSize(context, 14, 16, 18),
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(width: 8),
-              const Icon(Icons.keyboard_arrow_down, color: Colors.white),
-              const Spacer(),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: AppColors.green,
-                  borderRadius: BorderRadius.circular(15),
-                ),
-                child: Text(
-                  '$_batteryPercentage%',
+                  elevation: 8,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                )
+              // Tampilkan placeholder jika masih loading atau tidak ada alat
+              else
+                Text(
+                  _isLoading ? 'Memuat alat...' : '-',
                   style: GoogleFonts.quicksand(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
-                    fontSize: getResponsiveSize(context, 10, 12, 14),
+                    fontSize: 18,
                   ),
                 ),
-              ),
+              const Spacer(),
+              if (_isSolarPower == false)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.green,
+                    borderRadius: BorderRadius.circular(15),
+                  ),
+                  child: Text(
+                    '$_batteryPercentage%',
+                    style: GoogleFonts.quicksand(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
             ],
           ),
           const SizedBox(height: 16),
@@ -468,19 +584,23 @@ class _HomePageState extends State<HomePage> {
             children: [
               Expanded(
                 child: _buildDeviceStatusCard(
-                  title: 'Status Koneksi,',
-                  value: _connectionStatus,
+                  title: 'Status Koneksi',
+                  value: _connectionStatus == true ? 'Online' : 'Offline',
                   imagePath: 'assets/images/internet.png',
-                  valueColor: AppColors.green,
+                  valueColor: _connectionStatus == true
+                      ? AppColors.green
+                      : Colors.redAccent,
                 ),
               ),
               const SizedBox(width: 16),
               Expanded(
                 child: _buildDeviceStatusCard(
-                  title: 'Sumber Daya,',
+                  title: 'Sumber Daya',
                   value: _powerSource,
                   imagePath: _powerImage,
-                  valueColor: AppColors.primary,
+                  valueColor: _isSolarPower == true
+                      ? AppColors.primary
+                      : AppColors.orange,
                 ),
               ),
             ],
@@ -491,18 +611,19 @@ class _HomePageState extends State<HomePage> {
               onPressed: () {
                 showDeviceDetail(
                   context,
-                  connectionStatus: _connectionStatus,
+                  connectionStatus: _connectionStatus == true
+                      ? 'Online'
+                      : 'Offline',
                   powerSource: _powerSource,
                   batteryPercentage: _batteryPercentage,
+                  deviceName: _deviceName ?? '-',
                 );
               },
               child: Text(
                 "Lihat Detail",
                 style: GoogleFonts.quicksand(
-                  fontWeight: FontWeight.w600,
                   color: Colors.white,
                   decoration: TextDecoration.underline,
-                  decorationColor: Colors.white,
                 ),
               ),
             ),
@@ -527,34 +648,19 @@ class _HomePageState extends State<HomePage> {
       child: Stack(
         children: [
           Padding(
-            padding: const EdgeInsets.only(
-              left: 16.0,
-              right: 16.0,
-              bottom: 16.0,
-              top: 10.0,
-            ),
+            padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   title,
-                  style: GoogleFonts.quicksand(
-                    color: AppColors.text,
-                    fontSize: getResponsiveSize(context, 12, 14, 16),
-                  ),
+                  style: GoogleFonts.quicksand(color: AppColors.text),
                 ),
-                const SizedBox(height: 4),
-                SizedBox(
-                  width: 80,
-                  child: Text(
-                    value,
-                    softWrap: true,
-                    overflow: TextOverflow.visible,
-                    style: GoogleFonts.quicksand(
-                      color: valueColor,
-                      fontSize: getResponsiveSize(context, 16, 18, 20),
-                      fontWeight: FontWeight.bold,
-                    ),
+                Text(
+                  value,
+                  style: GoogleFonts.quicksand(
+                    color: valueColor,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
               ],
