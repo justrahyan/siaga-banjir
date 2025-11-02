@@ -59,25 +59,27 @@ class CuacaCard extends StatelessWidget {
                     const Icon(Icons.cloud, color: Colors.white, size: 64),
               ),
               const SizedBox(width: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    "$suhu°C",
-                    style: GoogleFonts.quicksand(
-                      color: Colors.white,
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "$suhu°C",
+                      style: GoogleFonts.quicksand(
+                        color: Colors.white,
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
-                  Text(
-                    kondisi,
-                    style: GoogleFonts.quicksand(
-                      color: Colors.white,
-                      fontSize: 14,
+                    Text(
+                      kondisi,
+                      style: GoogleFonts.quicksand(
+                        color: Colors.white,
+                        fontSize: 14,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ],
           ),

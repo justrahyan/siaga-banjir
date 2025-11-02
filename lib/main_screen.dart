@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -12,11 +13,13 @@ import 'peta_page.dart';
 class MainScreen extends StatefulWidget {
   final double latitude;
   final double longitude;
+  final String selectedDeviceKey;
 
   const MainScreen({
     super.key,
     required this.latitude,
     required this.longitude,
+    required this.selectedDeviceKey,
   });
 
   @override
@@ -29,12 +32,16 @@ class _MainScreenState extends State<MainScreen> {
   String? _lastNotifiedStatus;
 
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  final DatabaseReference _dbRef = FirebaseDatabase.instance.ref();
+  final DatabaseReference _dbRef = FirebaseDatabase.instanceFor(
+    app: Firebase.app(),
+    databaseURL:
+        'https://siaga-banjir-b73a8-default-rtdb.asia-southeast1.firebasedatabase.app/',
+  ).ref();
 
   @override
   void initState() {
     super.initState();
-    _setupFirebaseListener(); // 🔹 Jalankan listener sensor
+    _setupFirebaseListener();
   }
 
   @override
@@ -45,80 +52,104 @@ class _MainScreenState extends State<MainScreen> {
 
   Future<void> _setupFirebaseListener() async {
     try {
+      print("🚀 [INIT] Mulai setup listener Firebase...");
+
       if (_auth.currentUser == null) {
+        print("🔑 [AUTH] Belum login, mencoba login admin...");
         await _auth.signInWithEmailAndPassword(
           email: 'admin@gmail.com',
           password: 'admin123',
         );
-        print("✅ Login Firebase berhasil di MainScreen");
+        print("✅ [AUTH] Login Firebase berhasil di MainScreen");
+      } else {
+        print("ℹ️ [AUTH] Sudah login sebagai: ${_auth.currentUser!.email}");
       }
 
-      // 🔹 Dengarkan data sensor dari Firebase
-      _dataSubscription = _dbRef.child('Sensor').onValue.listen((event) {
-        final data = event.snapshot.value;
-        print("📡 Data Realtime DB diterima: $data");
+      print(
+        "🎧 [DB] Mulai mendengarkan node: /Alat/${widget.selectedDeviceKey}",
+      );
 
-        if (data != null && data is Map) {
-          double waterLevel = ((data['WaterLevel'] ?? 0) as num).toDouble();
-          double ultrasonic = ((data['Ultrasonic'] ?? 0) as num).toDouble();
+      // Dengarkan semua alat dalam node Alat
+      _dataSubscription = _dbRef
+          .child('Alat/${widget.selectedDeviceKey}/Sensor')
+          .onValue
+          .listen(
+            (event) {
+              final data = event.snapshot.value;
+              print("📡 [DB] Data alat ${widget.selectedDeviceKey}: $data");
 
-          double ketinggianUntukNotifikasi = (waterLevel >= 50)
-              ? ultrasonic
-              : 0;
+              if (data != null && data is Map) {
+                double waterLevel = ((data['WaterLevel'] ?? 0) as num)
+                    .toDouble();
+                double ultrasonic = ((data['Ultrasonic'] ?? 0) as num)
+                    .toDouble();
 
-          _checkFloodStatusAndNotify(ketinggianUntukNotifikasi);
-
-          print(
-            "✅ Ketinggian untuk notifikasi: ${ketinggianUntukNotifikasi.toStringAsFixed(1)} cm",
+                _checkFloodStatusAndNotify(
+                  widget.selectedDeviceKey,
+                  ultrasonic,
+                  waterLevel,
+                );
+              } else {
+                print("⚠️ [DB] Data kosong atau format salah");
+              }
+            },
+            onError: (error) {
+              print("❌ [DB] Error membaca data: $error");
+            },
           );
-        } else {
-          print("⚠️ Data Realtime DB kosong atau format salah");
-        }
-      });
+
+      print("✅ [LISTENER] Listener Firebase aktif!");
     } catch (e) {
-      print("❌ Error setup listener di MainScreen: $e");
+      print("❌ [SETUP] Gagal setup listener: $e");
     }
   }
 
-  void _checkFloodStatusAndNotify(double level) {
-    print(
-      "--- Menganalisa Level: $level | Status Notif Terakhir: $_lastNotifiedStatus ---",
-    );
+  void _checkFloodStatusAndNotify(
+    String alatKey,
+    double ultrasonic,
+    double waterLevel,
+  ) async {
+    print("🧠 [ANALISIS-$alatKey] UL: $ultrasonic | WL: $waterLevel");
 
     String currentStatus;
     String title = "Peringatan Banjir!";
     String body = "";
 
-    if (level >= 100) {
-      currentStatus = "Bahaya";
-      body =
-          "Status ketinggian air BAHAYA (${level.toStringAsFixed(1)} cm). Segera evakuasi diri!";
-    } else if (level >= 50) {
+    // === Logika status banjir (sesuai home_page.dart) ===
+    if (waterLevel < 100 || ultrasonic <= 30) {
+      currentStatus = "Aman";
+    } else if (ultrasonic <= 70) {
       currentStatus = "Waspada";
       body =
-          "Status ketinggian air WASPADA (${level.toStringAsFixed(1)} cm). Siapkan diri untuk kemungkinan terburuk.";
+          "Status WASPADA di $alatKey (${waterLevel.toStringAsFixed(1)} cm). Tetap siaga!";
     } else {
-      currentStatus = "Aman";
+      currentStatus = "Bahaya";
+      body =
+          "Status BAHAYA di $alatKey (${waterLevel.toStringAsFixed(1)} cm). Segera evakuasi!";
     }
 
-    print("Status saat ini: '$currentStatus'");
+    print("📊 [STATUS-$alatKey] Sekarang: $currentStatus");
 
+    // === Kirim notifikasi jika berubah ===
     if (currentStatus != "Aman" && currentStatus != _lastNotifiedStatus) {
-      print("✅ Notifikasi dikirim!");
-      NotificationService().showNotification(title, body);
+      print("📣 [NOTIF-$alatKey] Mengirim notifikasi lokal...");
+      try {
+        await NotificationService().showNotification(title, body);
+        print("✅ [NOTIF-$alatKey] Notifikasi berhasil dikirim!");
+      } catch (e) {
+        print("❌ [NOTIF-$alatKey] Gagal kirim notifikasi: $e");
+      }
       _lastNotifiedStatus = currentStatus;
     } else if (currentStatus == "Aman") {
-      print("ℹ️ Kondisi Aman, reset status notifikasi");
+      print("ℹ️ [RESET-$alatKey] Kondisi aman, reset status notifikasi");
       _lastNotifiedStatus = "Aman";
     } else {
-      print("⚠️ Tidak ada perubahan status, notifikasi tidak dikirim.");
+      print("⚠️ [SKIP-$alatKey] Tidak ada perubahan status.");
     }
   }
 
   void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
+    setState(() => _selectedIndex = index);
   }
 
   BottomNavigationBarItem _buildNavItem({
@@ -157,7 +188,6 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // 🔹 Daftar halaman, HomePage menerima lokasi dari SplashScreen
     final List<Widget> _screens = [
       HomePage(latitude: widget.latitude, longitude: widget.longitude),
       const PetaPage(),
@@ -172,12 +202,6 @@ class _MainScreenState extends State<MainScreen> {
         type: BottomNavigationBarType.fixed,
         showUnselectedLabels: false,
         showSelectedLabels: false,
-        selectedLabelStyle: GoogleFonts.quicksand(
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
-          color: AppColors.primary,
-        ),
-        unselectedLabelStyle: GoogleFonts.quicksand(fontSize: 12),
         items: [
           _buildNavItem(
             index: 0,

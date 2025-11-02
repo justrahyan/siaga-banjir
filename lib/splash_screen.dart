@@ -6,6 +6,7 @@ import 'package:siaga_banjir/main_screen.dart';
 import 'package:siaga_banjir/themes/colors.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
+import 'package:flutter_local_notifications/flutter_local_notifications.dart'; // 🔔
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -15,6 +16,9 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
+  final FlutterLocalNotificationsPlugin _flutterLocalNotificationsPlugin =
+      FlutterLocalNotificationsPlugin(); // 🔔
+
   @override
   void initState() {
     super.initState();
@@ -23,6 +27,12 @@ class _SplashScreenState extends State<SplashScreen> {
 
   Future<void> _initApp() async {
     try {
+      print("🚀 Memulai inisialisasi aplikasi...");
+
+      // 🔔 Minta izin notifikasi (Android 13+ wajib)
+      await _requestNotificationPermission();
+
+      // 🧭 Cek dan minta izin lokasi
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
         await Geolocator.openLocationSettings();
@@ -50,7 +60,7 @@ class _SplashScreenState extends State<SplashScreen> {
 
       // 🌦️ Kirim ke server Flask untuk prediksi cuaca
       final response = await http.post(
-        Uri.parse("http://<IP_SERVER>:5000/prediksi"), // 🔧 ganti <IP_SERVER>
+        Uri.parse("http://<IP_SERVER>:5000/prediksi"), // 🔧 ganti IP_SERVER
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({"lat": lat, "lon": lon}),
       );
@@ -61,14 +71,18 @@ class _SplashScreenState extends State<SplashScreen> {
       if (mounted) {
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
-            builder: (context) => MainScreen(latitude: lat, longitude: lon),
+            builder: (context) => MainScreen(
+              latitude: lat,
+              longitude: lon,
+              selectedDeviceKey: 'alat1',
+            ),
           ),
         );
       }
     } catch (e) {
       print("❌ Error in SplashScreen: $e");
 
-      // 🧭 Jika gagal ambil lokasi, pakai default koordinat (misal: Gowa)
+      // 🧭 Jika gagal ambil lokasi, pakai default koordinat
       double defaultLat = -5.1767;
       double defaultLon = 119.4286;
 
@@ -76,12 +90,36 @@ class _SplashScreenState extends State<SplashScreen> {
       if (mounted) {
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
-            builder: (context) =>
-                MainScreen(latitude: defaultLat, longitude: defaultLon),
+            builder: (context) => MainScreen(
+              latitude: defaultLat,
+              longitude: defaultLon,
+              selectedDeviceKey: 'alat1',
+            ),
           ),
         );
       }
     }
+  }
+
+  // 🔔 Fungsi minta izin notifikasi
+  Future<void> _requestNotificationPermission() async {
+    const AndroidInitializationSettings initializationSettingsAndroid =
+        AndroidInitializationSettings('@mipmap/ic_launcher');
+
+    final InitializationSettings initializationSettings =
+        InitializationSettings(android: initializationSettingsAndroid);
+
+    await _flutterLocalNotificationsPlugin.initialize(initializationSettings);
+
+    final AndroidFlutterLocalNotificationsPlugin? androidImplementation =
+        _flutterLocalNotificationsPlugin
+            .resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin
+            >();
+
+    final bool? granted = await androidImplementation
+        ?.requestNotificationsPermission();
+    print("🔔 Izin notifikasi: ${granted == true ? 'DISETUJUI' : 'DITOLAK'}");
   }
 
   void _showPermissionDialog() {
