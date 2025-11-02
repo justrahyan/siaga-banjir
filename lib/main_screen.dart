@@ -10,7 +10,14 @@ import 'panduan_page.dart';
 import 'peta_page.dart';
 
 class MainScreen extends StatefulWidget {
-  const MainScreen({super.key});
+  final double latitude;
+  final double longitude;
+
+  const MainScreen({
+    super.key,
+    required this.latitude,
+    required this.longitude,
+  });
 
   @override
   State<MainScreen> createState() => _MainScreenState();
@@ -27,43 +34,38 @@ class _MainScreenState extends State<MainScreen> {
   @override
   void initState() {
     super.initState();
-    _setupFirebaseListener(); // Panggil listener saat state dimulai
+    _setupFirebaseListener(); // 🔹 Jalankan listener sensor
   }
 
   @override
   void dispose() {
-    _dataSubscription?.cancel(); // Hentikan listener saat widget dihancurkan
+    _dataSubscription?.cancel();
     super.dispose();
   }
 
   Future<void> _setupFirebaseListener() async {
     try {
-      // 1. Login terlebih dahulu (seperti di kode home_page Anda)
-      // Pastikan user belum login untuk menghindari error
       if (_auth.currentUser == null) {
         await _auth.signInWithEmailAndPassword(
           email: 'admin@gmail.com',
           password: 'admin123',
         );
-        print("✅ Login berhasil di MainScreen");
+        print("✅ Login Firebase berhasil di MainScreen");
       }
 
-      // 2. Setup listener ke path 'Sensor'
+      // 🔹 Dengarkan data sensor dari Firebase
       _dataSubscription = _dbRef.child('Sensor').onValue.listen((event) {
         final data = event.snapshot.value;
         print("📡 Data Realtime DB diterima: $data");
 
         if (data != null && data is Map) {
-          // Ambil data dan konversi ke double
           double waterLevel = ((data['WaterLevel'] ?? 0) as num).toDouble();
           double ultrasonic = ((data['Ultrasonic'] ?? 0) as num).toDouble();
 
-          // Terapkan logika yang sama: ultrasonic aktif jika waterLevel >= 50
           double ketinggianUntukNotifikasi = (waterLevel >= 50)
               ? ultrasonic
               : 0;
 
-          // Panggil fungsi pengecekan status untuk mengirim notifikasi
           _checkFloodStatusAndNotify(ketinggianUntukNotifikasi);
 
           print(
@@ -74,11 +76,10 @@ class _MainScreenState extends State<MainScreen> {
         }
       });
     } catch (e) {
-      print("❌ Error saat setup listener di MainScreen: $e");
+      print("❌ Error setup listener di MainScreen: $e");
     }
   }
 
-  // Fungsi ini tetap sama, tidak perlu diubah
   void _checkFloodStatusAndNotify(double level) {
     print(
       "--- Menganalisa Level: $level | Status Notif Terakhir: $_lastNotifiedStatus ---",
@@ -100,28 +101,19 @@ class _MainScreenState extends State<MainScreen> {
       currentStatus = "Aman";
     }
 
-    print("Status saat ini dihitung sebagai: '$currentStatus'");
+    print("Status saat ini: '$currentStatus'");
 
-    // Kirim notifikasi HANYA jika status berubah menjadi lebih buruk
     if (currentStatus != "Aman" && currentStatus != _lastNotifiedStatus) {
-      print("✅ KONDISI TERPENUHI! Memicu pengiriman notifikasi...");
+      print("✅ Notifikasi dikirim!");
       NotificationService().showNotification(title, body);
-      // Simpan status terakhir yang dinotifikasi (tidak perlu setState karena tidak update UI)
       _lastNotifiedStatus = currentStatus;
     } else if (currentStatus == "Aman") {
-      print("ℹ️ Kondisi Aman. Status notifikasi direset.");
-      // Reset status jika sudah aman
+      print("ℹ️ Kondisi Aman, reset status notifikasi");
       _lastNotifiedStatus = "Aman";
     } else {
-      // --- DEBUG START ---
-      print(
-        "⚠️ Kondisi tidak terpenuhi. Alasan: Status masih sama ('$currentStatus') atau Aman.",
-      );
-      // --- DEBUG END ---
+      print("⚠️ Tidak ada perubahan status, notifikasi tidak dikirim.");
     }
   }
-
-  final List<Widget> _screens = const [HomePage(), PetaPage(), PanduanPage()];
 
   void _onItemTapped(int index) {
     setState(() {
@@ -165,6 +157,13 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // 🔹 Daftar halaman, HomePage menerima lokasi dari SplashScreen
+    final List<Widget> _screens = [
+      HomePage(latitude: widget.latitude, longitude: widget.longitude),
+      const PetaPage(),
+      const PanduanPage(),
+    ];
+
     return Scaffold(
       body: _screens[_selectedIndex],
       bottomNavigationBar: BottomNavigationBar(
@@ -198,12 +197,6 @@ class _MainScreenState extends State<MainScreen> {
             primaryIcon: 'assets/images/icon/panduan-primary.png',
             secondaryIcon: 'assets/images/icon/panduan-secondary.png',
           ),
-          // _buildNavItem(
-          //   index: 2,
-          //   label: "Riwayat",
-          //   primaryIcon: 'assets/images/icon/riwayat-primary.png',
-          //   secondaryIcon: 'assets/images/icon/riwayat-secondary.png',
-          // ),
         ],
       ),
     );

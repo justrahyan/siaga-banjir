@@ -1,9 +1,11 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:siaga_banjir/main_screen.dart';
 import 'package:siaga_banjir/themes/colors.dart';
-import 'home_page.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:http/http.dart' as http;
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -16,13 +18,92 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    Timer(const Duration(seconds: 3), () {
+    _initApp();
+  }
+
+  Future<void> _initApp() async {
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        await Geolocator.openLocationSettings();
+      }
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+
+      if (permission == LocationPermission.deniedForever ||
+          permission == LocationPermission.denied) {
+        _showPermissionDialog();
+        return;
+      }
+
+      // 🌍 Ambil lokasi pengguna
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+
+      double lat = position.latitude;
+      double lon = position.longitude;
+      print("📍 Lokasi pengguna: ($lat, $lon)");
+
+      // 🌦️ Kirim ke server Flask untuk prediksi cuaca
+      final response = await http.post(
+        Uri.parse("http://<IP_SERVER>:5000/prediksi"), // 🔧 ganti <IP_SERVER>
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({"lat": lat, "lon": lon}),
+      );
+
+      print("🌦️ Response server: ${response.statusCode}");
+
+      await Future.delayed(const Duration(seconds: 2));
       if (mounted) {
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => const MainScreen()),
+          MaterialPageRoute(
+            builder: (context) => MainScreen(latitude: lat, longitude: lon),
+          ),
         );
       }
-    });
+    } catch (e) {
+      print("❌ Error in SplashScreen: $e");
+
+      // 🧭 Jika gagal ambil lokasi, pakai default koordinat (misal: Gowa)
+      double defaultLat = -5.1767;
+      double defaultLon = 119.4286;
+
+      await Future.delayed(const Duration(seconds: 2));
+      if (mounted) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (context) =>
+                MainScreen(latitude: defaultLat, longitude: defaultLon),
+          ),
+        );
+      }
+    }
+  }
+
+  void _showPermissionDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("Izin Lokasi Diperlukan"),
+        content: const Text(
+          "Aplikasi memerlukan izin lokasi untuk menampilkan data cuaca dan peta. "
+          "Aktifkan izin lokasi melalui pengaturan perangkat Anda.",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              Geolocator.openAppSettings();
+            },
+            child: const Text("Buka Pengaturan"),
+          ),
+        ],
+      ),
+    );
   }
 
   @override

@@ -36,7 +36,10 @@ Future<Position> getCurrentLocation() async {
 }
 
 class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+  final double latitude;
+  final double longitude;
+
+  const HomePage({super.key, required this.latitude, required this.longitude});
 
   @override
   _HomePageState createState() => _HomePageState();
@@ -56,7 +59,7 @@ class _HomePageState extends State<HomePage> {
   final Map<String, String> _deviceList = {};
   String? _selectedDeviceKey;
   String? _deviceName;
-  bool? _connectionStatus;
+  bool? _isConnected;
   bool? _isSolarPower;
   double? _waterLevel;
   double? _ultrasonic;
@@ -161,7 +164,8 @@ class _HomePageState extends State<HomePage> {
             if (mounted) {
               setState(() {
                 _deviceName = data['nama_alat'];
-                _connectionStatus = isKoneksiOn;
+                _isConnected =
+                    (data['koneksi'] == true || data['koneksi'] == 'true');
                 _isSolarPower = isSolar;
                 _waterLevel = waterLevel;
                 _ultrasonic = ultrasonic;
@@ -291,9 +295,12 @@ class _HomePageState extends State<HomePage> {
                       ),
               ),
               const SizedBox(height: 16),
-              const Padding(
+              Padding(
                 padding: EdgeInsets.symmetric(horizontal: 16.0),
-                child: CuacaSection(kodeWilayah: "31.71.03.1001"),
+                child: CuacaSection(
+                  latitude: widget.latitude,
+                  longitude: widget.longitude,
+                ),
               ),
             ],
           ),
@@ -530,15 +537,13 @@ class _HomePageState extends State<HomePage> {
                   onSelected: (String newKey) {
                     if (newKey != _selectedDeviceKey) {
                       setState(() {
-                        _isLoading = true; // Tampilkan loading
+                        _isLoading = true;
                         _selectedDeviceKey = newKey;
-                        // Kosongkan data lama
-                        _deviceName = null;
-                        _connectionStatus = null;
+                        _deviceName = 'Tidak diketahui';
+                        _isConnected = false;
                         _waterLevel = null;
                         _ultrasonic = null;
                       });
-                      // Panggil listener untuk alat yang baru dipilih
                       _listenToDevice(newKey);
                     }
                   },
@@ -585,9 +590,9 @@ class _HomePageState extends State<HomePage> {
               Expanded(
                 child: _buildDeviceStatusCard(
                   title: 'Status Koneksi',
-                  value: _connectionStatus == true ? 'Online' : 'Offline',
+                  value: _isConnected == true ? 'Online' : 'Offline',
                   imagePath: 'assets/images/internet.png',
-                  valueColor: _connectionStatus == true
+                  valueColor: _isConnected == true
                       ? AppColors.green
                       : Colors.redAccent,
                 ),
@@ -611,9 +616,7 @@ class _HomePageState extends State<HomePage> {
               onPressed: () {
                 showDeviceDetail(
                   context,
-                  connectionStatus: _connectionStatus == true
-                      ? 'Online'
-                      : 'Offline',
+                  connectionStatus: _isConnected == true ? 'Online' : 'Offline',
                   powerSource: _powerSource,
                   batteryPercentage: _batteryPercentage,
                   deviceName: _deviceName ?? '-',

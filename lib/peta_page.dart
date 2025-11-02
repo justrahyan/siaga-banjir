@@ -50,20 +50,11 @@ class _PetaPageState extends State<PetaPage> {
 
   Future<void> _fetchUserLocation() async {
     try {
-      bool enabled = await Geolocator.isLocationServiceEnabled();
-      if (!enabled) return;
-
-      LocationPermission p = await Geolocator.checkPermission();
-      if (p == LocationPermission.denied) {
-        p = await Geolocator.requestPermission();
-      }
-      if (p == LocationPermission.deniedForever ||
-          p == LocationPermission.denied)
-        return;
-
       final pos = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
       );
+
+      if (!mounted) return; // ✅ pastikan widget masih aktif sebelum setState
       setState(() => _userLocation = LatLng(pos.latitude, pos.longitude));
     } catch (e) {
       print("❌ Gagal mendapatkan lokasi pengguna: $e");

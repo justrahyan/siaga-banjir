@@ -1,8 +1,8 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
-import 'package:siaga_banjir/home_page.dart';
 import '../themes/colors.dart';
 import 'package:intl/intl.dart';
 
@@ -10,7 +10,6 @@ class CuacaCard extends StatelessWidget {
   final String icon;
   final String suhu;
   final String kondisi;
-  final String angin;
   final String kelembapan;
   final String waktu;
   final bool isToday;
@@ -20,7 +19,6 @@ class CuacaCard extends StatelessWidget {
     required this.icon,
     required this.suhu,
     required this.kondisi,
-    required this.angin,
     required this.kelembapan,
     required this.waktu,
     this.isToday = false,
@@ -60,7 +58,6 @@ class CuacaCard extends StatelessWidget {
                 errorBuilder: (ctx, err, stack) =>
                     const Icon(Icons.cloud, color: Colors.white, size: 64),
               ),
-              // Image.asset(icon, width: 84, height: 84),
               const SizedBox(width: 12),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -86,33 +83,15 @@ class CuacaCard extends StatelessWidget {
           ),
           const Spacer(),
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  const Icon(Icons.air, size: 16, color: Colors.white70),
-                  const SizedBox(width: 4),
-                  Text(
-                    angin,
-                    style: GoogleFonts.quicksand(
-                      color: Colors.white70,
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
-              ),
-              Row(
-                children: [
-                  const Icon(Icons.water_drop, size: 16, color: Colors.white70),
-                  const SizedBox(width: 4),
-                  Text(
-                    "$kelembapan%",
-                    style: GoogleFonts.quicksand(
-                      color: Colors.white70,
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
+              const Icon(Icons.water_drop, size: 16, color: Colors.white70),
+              const SizedBox(width: 4),
+              Text(
+                "$kelembapan%",
+                style: GoogleFonts.quicksand(
+                  color: Colors.white70,
+                  fontSize: 12,
+                ),
               ),
             ],
           ),
@@ -123,82 +102,86 @@ class CuacaCard extends StatelessWidget {
 }
 
 class CuacaSection extends StatefulWidget {
-  final String kodeWilayah;
-  const CuacaSection({super.key, required this.kodeWilayah});
-  // const CuacaSection({super.key});
+  final double latitude;
+  final double longitude;
+
+  const CuacaSection({
+    super.key,
+    required this.latitude,
+    required this.longitude,
+  });
 
   @override
   State<CuacaSection> createState() => _CuacaSectionState();
 }
 
 class _CuacaSectionState extends State<CuacaSection> {
-  Map<String, dynamic>? cuaca; // ini utk Open Weather Map
-  List<dynamic> prakiraan = []; // ini utk BMKG
+  List<dynamic> prakiraan = [];
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    // getCurrentLocation().then((pos) {
-    //   fetchCuaca(pos.latitude, pos.longitude);
-    // });
-    // fetchCuaca(-5.167971, 119.433536);
-    fetchCuaca();
+    fetchCuacaFromServer();
   }
 
-  // double lat, double lon utk argumen fetchCuaca
-  Future<void> fetchCuaca() async {
-    const apiKey = "bb2dd84ca2541574dac0faffefcb4e45";
-    // final url =
-    //     "https://api.openweathermap.org/data/2.5/weather?lat=$lat&lon=$lon&appid=$apiKey&units=metric&lang=id";
-
-    final url =
-        "https://api.bmkg.go.id/publik/prakiraan-cuaca?adm4=${widget.kodeWilayah}";
-    print("URL: $url");
-    // print("Latitude:" + lat.toString());
-    // print("Longitude:" + lon.toString());
-
-    try {
-      final res = await http.get(Uri.parse(url));
-      if (res.statusCode == 200) {
-        final data = jsonDecode(res.body);
-        print("✅ Parsed JSON: $data");
-
-        final List rawData = data["data"] ?? [];
-        List<dynamic> extracted = [];
-
-        if (rawData.isNotEmpty && rawData[0]["cuaca"] != null) {
-          // Flatten biar gampang dipakai di ListView
-          for (var entry in rawData[0]["cuaca"]) {
-            if (entry is List && entry.isNotEmpty) {
-              extracted.add(entry[0]);
-            }
-          }
-        }
-        setState(() {
-          cuaca = data;
-          prakiraan = extracted;
-        });
-      } else {
-        print("❌ Error: ${res.body}");
-      }
-    } catch (e) {
-      print("🔥 Exception: $e");
+  // 🔹 Ganti IP ini sesuai IP laptop kamu (lihat di cmd: ipconfig)
+  String getBaseUrl() {
+    if (Platform.isAndroid) {
+      return "http://192.168.1.3:5000"; // ← ganti sesuai IP laptop kamu
+    } else {
+      return "http://10.0.2.2:5000"; // untuk emulator
     }
   }
 
-  String getIconUrl(String iconCode) {
-    return "https://openweathermap.org/img/wn/$iconCode@2x.png";
+  Future<void> fetchCuacaFromServer() async {
+    print("🌤️ [DEBUG] Mengambil cuaca dari Flask server...");
+
+    final url =
+        "${getBaseUrl()}/prediksi?lat=${widget.latitude}&lon=${widget.longitude}";
+    print("🛰️ [DEBUG] URL: $url");
+
+    try {
+      final res = await http.post(
+        Uri.parse(url),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({"lat": widget.latitude, "lon": widget.longitude}),
+      );
+
+      if (!mounted) return; // ⬅️ tambahkan ini
+
+      if (res.statusCode == 200) {
+        final body = jsonDecode(res.body);
+        final List<dynamic> data = body["data"] ?? [];
+
+        if (!mounted) return; // ⬅️ tambahkan ini juga
+        setState(() {
+          prakiraan = data;
+          _isLoading = false;
+        });
+
+        print("✅ [DEBUG] Berhasil ambil ${data.length} item cuaca");
+      } else {
+        if (!mounted) return;
+        print("❌ [DEBUG] Gagal ambil cuaca: ${res.body}");
+        setState(() => _isLoading = false);
+      }
+    } catch (e) {
+      if (!mounted) return; // ⬅️ dan ini
+      print("🔥 [DEBUG] Error ambil cuaca: $e");
+      setState(() => _isLoading = false);
+    }
   }
 
   String getIcon(String desc) {
-    if (desc.contains("Hujan")) return "assets/images/icon/cuaca/rain.png";
-    if (desc.contains("Cerah")) return "assets/images/icon/cuaca/sunny.png";
-    if (desc.contains("Berawan")) return "assets/images/icon/cuaca/cloudy.png";
-    if (desc.contains("Badai")) return "assets/images/icon/cuaca/thunder.png";
-    if (desc.contains("Badai")) {
-      return "assets/images/icon/cuaca/thunder.png";
-    }
-    return "assets/images/icon/cuaca/cloud_and_rainny.png";
+    desc = desc.toLowerCase();
+    if (desc.contains("hujan"))
+      return "https://openweathermap.org/img/wn/10d@2x.png";
+    if (desc.contains("cerah"))
+      return "https://openweathermap.org/img/wn/01d@2x.png";
+    if (desc.contains("berawan"))
+      return "https://openweathermap.org/img/wn/03d@2x.png";
+    return "https://openweathermap.org/img/wn/04d@2x.png";
   }
 
   @override
@@ -207,54 +190,26 @@ class _CuacaSectionState extends State<CuacaSection> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          "Prakiraan Cuaca",
+          "Prakiraan Cuaca (AI)",
           style: GoogleFonts.quicksand(
             fontSize: 16,
             fontWeight: FontWeight.bold,
           ),
         ),
         const SizedBox(height: 8),
-        // SizedBox(
-        //   height: 200,
-        //   child: cuaca == null
-        //       ? const Center(
-        //           child: Column(
-        //             children: [
-        //               CircularProgressIndicator(
-        //                 valueColor: AlwaysStoppedAnimation(AppColors.primary),
-        //               ),
-        //               SizedBox(height: 12),
-        //               Text(
-        //                 "Memuat data cuaca...",
-        //                 style: TextStyle(color: AppColors.text, fontSize: 12),
-        //               ),
-        //             ],
-        //           ),
-        //         )
-        //       : PageView(
-        //           controller: PageController(viewportFraction: 0.95),
-        //           children: [
-        //             CuacaCard(
-        //               icon: getIconUrl(cuaca!["weather"][0]["icon"]),
-        //               suhu: cuaca!["main"]["temp"].toString(),
-        //               kondisi: cuaca!["weather"][0]["description"],
-        //               angin: "${cuaca!["wind"]["speed"]} m/s",
-        //               kelembapan: cuaca!["main"]["humidity"].toString(),
-        //               waktu: DateFormat(
-        //                 "dd MMMM yyyy",
-        //                 "id_ID",
-        //               ).format(DateTime.now()),
-        //               isToday: true,
-        //             ),
-        //           ],
-        //         ),
-        // ),
         SizedBox(
           height: 200,
-          child: prakiraan.isEmpty
+          child: _isLoading
               ? const Center(
                   child: CircularProgressIndicator(
                     valueColor: AlwaysStoppedAnimation(AppColors.primary),
+                  ),
+                )
+              : prakiraan.isEmpty
+              ? const Center(
+                  child: Text(
+                    "Tidak ada data cuaca.",
+                    style: TextStyle(color: AppColors.text, fontSize: 12),
                   ),
                 )
               : PageView.builder(
@@ -262,61 +217,30 @@ class _CuacaSectionState extends State<CuacaSection> {
                   itemCount: prakiraan.length,
                   itemBuilder: (context, index) {
                     final item = prakiraan[index];
-                    final waktu = item["local_datetime"].toString();
+                    final waktuRaw = item["local_datetime"] ?? "";
+                    final waktu = waktuRaw.isNotEmpty
+                        ? DateFormat(
+                            "EEEE, dd MMM yyyy",
+                            "id_ID",
+                          ).format(DateTime.parse(waktuRaw))
+                        : "-";
 
                     return CuacaCard(
                       icon: getIcon(item["weather_desc"] ?? ""),
-                      suhu: item["t"].toString(),
-                      kondisi: item["weather_desc"] ?? "",
-                      angin: "${item["ws"]} km/h",
-                      kelembapan: item["hu"].toString(),
+                      suhu: (item["t"] ?? 0).toString(),
+                      kondisi: item["weather_desc"] ?? "-",
+                      kelembapan: (item["hu"] ?? 0).toString(),
                       waktu: waktu,
-                      isToday: index == 0, // card pertama dianggap hari ini
+                      isToday: index == 0,
                     );
                   },
                 ),
         ),
         const SizedBox(height: 16),
-        Row(
-          children: [
-            Text(
-              "Sumber: ",
-              style: TextStyle(fontSize: 10, color: AppColors.text),
-            ),
-            const SizedBox(width: 4),
-            Row(
-              children: [
-                // SizedBox(
-                //   height: 24,
-                //   child: Image.asset(
-                //     "assets/images/logo/logo-openweathermap.png",
-                //   ),
-                // ),
-                // SizedBox(width: 8),
-                // Text(
-                //   'Open Weather Map',
-                //   style: GoogleFonts.quicksand(
-                //     fontSize: 12,
-                //     fontWeight: FontWeight.w600,
-                //   ),
-                // ),
-                SizedBox(
-                  height: 24,
-                  child: Image.asset("assets/images/logo/logo-bmkg.png"),
-                ),
-                SizedBox(width: 8),
-                Text(
-                  'BMKG',
-                  style: GoogleFonts.quicksand(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ],
+        Text(
+          "Sumber: OpenWeatherMap + AI (Local Flask)",
+          style: GoogleFonts.quicksand(fontSize: 12),
         ),
-        SizedBox(height: 12),
       ],
     );
   }
