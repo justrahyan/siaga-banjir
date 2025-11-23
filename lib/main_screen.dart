@@ -115,17 +115,16 @@ class _MainScreenState extends State<MainScreen> {
     String title = "Peringatan Banjir!";
     String body = "";
 
-    // === Logika status banjir (sesuai home_page.dart) ===
     if (waterLevel < 100 || ultrasonic <= 30) {
       currentStatus = "Aman";
     } else if (ultrasonic <= 70) {
       currentStatus = "Waspada";
       body =
-          "Status WASPADA di $alatKey (${waterLevel.toStringAsFixed(1)} cm). Tetap siaga!";
+          "Status WASPADA di $alatKey (${ultrasonic.toStringAsFixed(1)} cm). Tetap siaga!";
     } else {
       currentStatus = "Bahaya";
       body =
-          "Status BAHAYA di $alatKey (${waterLevel.toStringAsFixed(1)} cm). Segera evakuasi!";
+          "Status BAHAYA di $alatKey (${ultrasonic.toStringAsFixed(1)} cm). Segera evakuasi!";
     }
 
     print("📊 [STATUS-$alatKey] Sekarang: $currentStatus");

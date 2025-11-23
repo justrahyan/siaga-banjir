@@ -10,6 +10,7 @@ class CuacaCard extends StatelessWidget {
   final String icon;
   final String suhu;
   final String kondisi;
+  final String angin;
   final String kelembapan;
   final String waktu;
   final bool isToday;
@@ -19,6 +20,7 @@ class CuacaCard extends StatelessWidget {
     required this.icon,
     required this.suhu,
     required this.kondisi,
+    required this.angin,
     required this.kelembapan,
     required this.waktu,
     this.isToday = false,
@@ -104,14 +106,16 @@ class CuacaCard extends StatelessWidget {
 }
 
 class CuacaSection extends StatefulWidget {
-  final double latitude;
-  final double longitude;
+  // final double latitude;
+  // final double longitude;
+  final String kodeWilayah;
+  const CuacaSection({super.key, required this.kodeWilayah});
 
-  const CuacaSection({
-    super.key,
-    required this.latitude,
-    required this.longitude,
-  });
+  // const CuacaSection({
+  //   super.key,
+  //   required this.latitude,
+  //   required this.longitude,
+  // });
 
   @override
   State<CuacaSection> createState() => _CuacaSectionState();
@@ -124,7 +128,7 @@ class _CuacaSectionState extends State<CuacaSection> {
   @override
   void initState() {
     super.initState();
-    fetchCuacaFromServer();
+    fetchCuaca();
   }
 
   // 🔹 Ganti IP ini sesuai IP laptop kamu (lihat di cmd: ipconfig)
@@ -136,55 +140,102 @@ class _CuacaSectionState extends State<CuacaSection> {
     }
   }
 
-  Future<void> fetchCuacaFromServer() async {
-    print("🌤️ [DEBUG] Mengambil cuaca dari Flask server...");
-
+  Future<void> fetchCuaca() async {
     final url =
-        "${getBaseUrl()}/prediksi?lat=${widget.latitude}&lon=${widget.longitude}";
-    print("🛰️ [DEBUG] URL: $url");
+        "https://api.bmkg.go.id/publik/prakiraan-cuaca?adm4=${widget.kodeWilayah}";
+    print("📡 Fetching from: $url");
 
     try {
-      final res = await http.post(
-        Uri.parse(url),
-        headers: {"Content-Type": "application/json"},
-        body: jsonEncode({"lat": widget.latitude, "lon": widget.longitude}),
-      );
-
-      if (!mounted) return; // ⬅️ tambahkan ini
+      final res = await http.get(Uri.parse(url));
+      print("📥 Status Code: ${res.statusCode}");
 
       if (res.statusCode == 200) {
-        final body = jsonDecode(res.body);
-        final List<dynamic> data = body["data"] ?? [];
+        print("📥 Response Body: ${res.body.substring(0, 200)}...");
 
-        if (!mounted) return; // ⬅️ tambahkan ini juga
-        setState(() {
-          prakiraan = data;
-          _isLoading = false;
-        });
+        final data = jsonDecode(res.body);
+        print("✅ Parsed JSON: $data");
 
-        print("✅ [DEBUG] Berhasil ambil ${data.length} item cuaca");
-      } else {
-        if (!mounted) return;
-        print("❌ [DEBUG] Gagal ambil cuaca: ${res.body}");
-        setState(() => _isLoading = false);
+        final List rawData = data["data"] ?? [];
+        List<dynamic> extracted = [];
+        if (rawData.isNotEmpty && rawData[0]["cuaca"] != null) {
+          // Flatten biar gampang dipakai di ListView
+          for (var entry in rawData[0]["cuaca"]) {
+            if (entry is List && entry.isNotEmpty) {
+              extracted.add(entry[0]);
+            }
+          }
+          setState(() {
+            prakiraan = extracted;
+          });
+          print("🌤️ Jumlah data cuaca: ${prakiraan.length}");
+        } else {
+          print("❌ Error: status ${res.statusCode}, body=${res.body}");
+        }
       }
     } catch (e) {
-      if (!mounted) return; // ⬅️ dan ini
-      print("🔥 [DEBUG] Error ambil cuaca: $e");
-      setState(() => _isLoading = false);
+      print("🔥 Exception in fetchCuaca: $e");
     }
   }
 
   String getIcon(String desc) {
-    desc = desc.toLowerCase();
-    if (desc.contains("hujan"))
-      return "https://openweathermap.org/img/wn/10d@2x.png";
-    if (desc.contains("cerah"))
-      return "https://openweathermap.org/img/wn/01d@2x.png";
-    if (desc.contains("berawan"))
-      return "https://openweathermap.org/img/wn/03d@2x.png";
-    return "https://openweathermap.org/img/wn/04d@2x.png";
+    if (desc.contains("Hujan")) return "assets/images/icon/cuaca/rain.png";
+    if (desc.contains("Cerah")) return "assets/images/icon/cuaca/sunny.png";
+    if (desc.contains("Berawan")) return "assets/images/icon/cuaca/cloudy.png";
+    if (desc.contains("Badai")) {
+      return "assets/images/icon/cuaca/thunder.png";
+    }
+    return "assets/images/icon/cuaca/cloud_and_rainny.png";
   }
+
+  // Future<void> fetchCuacaFromServer() async {
+  //   print("🌤️ [DEBUG] Mengambil cuaca dari Flask server...");
+
+  //   final url =
+  //       "${getBaseUrl()}/prediksi?lat=${widget.latitude}&lon=${widget.longitude}";
+  //   print("🛰️ [DEBUG] URL: $url");
+
+  //   try {
+  //     final res = await http.post(
+  //       Uri.parse(url),
+  //       headers: {"Content-Type": "application/json"},
+  //       body: jsonEncode({"lat": widget.latitude, "lon": widget.longitude}),
+  //     );
+
+  //     if (!mounted) return; // ⬅️ tambahkan ini
+
+  //     if (res.statusCode == 200) {
+  //       final body = jsonDecode(res.body);
+  //       final List<dynamic> data = body["data"] ?? [];
+
+  //       if (!mounted) return; // ⬅️ tambahkan ini juga
+  //       setState(() {
+  //         prakiraan = data;
+  //         _isLoading = false;
+  //       });
+
+  //       print("✅ [DEBUG] Berhasil ambil ${data.length} item cuaca");
+  //     } else {
+  //       if (!mounted) return;
+  //       print("❌ [DEBUG] Gagal ambil cuaca: ${res.body}");
+  //       setState(() => _isLoading = false);
+  //     }
+  //   } catch (e) {
+  //     if (!mounted) return; // ⬅️ dan ini
+  //     print("🔥 [DEBUG] Error ambil cuaca: $e");
+  //     setState(() => _isLoading = false);
+  //   }
+  // }
+
+  // String getIcon(String desc) {
+  //   desc = desc.toLowerCase();
+  //   if (desc.contains("hujan"))
+  //     return "https://openweathermap.org/img/wn/10d@2x.png";
+  //   if (desc.contains("cerah"))
+  //     return "https://openweathermap.org/img/wn/01d@2x.png";
+  //   if (desc.contains("berawan"))
+  //     return "https://openweathermap.org/img/wn/03d@2x.png";
+  //   return "https://openweathermap.org/img/wn/04d@2x.png";
+  // }
 
   @override
   Widget build(BuildContext context) {
@@ -192,7 +243,7 @@ class _CuacaSectionState extends State<CuacaSection> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          "Prakiraan Cuaca (AI)",
+          "Prakiraan Cuaca",
           style: GoogleFonts.quicksand(
             fontSize: 16,
             fontWeight: FontWeight.bold,
@@ -201,17 +252,10 @@ class _CuacaSectionState extends State<CuacaSection> {
         const SizedBox(height: 8),
         SizedBox(
           height: 200,
-          child: _isLoading
+          child: prakiraan.isEmpty
               ? const Center(
                   child: CircularProgressIndicator(
                     valueColor: AlwaysStoppedAnimation(AppColors.primary),
-                  ),
-                )
-              : prakiraan.isEmpty
-              ? const Center(
-                  child: Text(
-                    "Tidak ada data cuaca.",
-                    style: TextStyle(color: AppColors.text, fontSize: 12),
                   ),
                 )
               : PageView.builder(
@@ -219,29 +263,35 @@ class _CuacaSectionState extends State<CuacaSection> {
                   itemCount: prakiraan.length,
                   itemBuilder: (context, index) {
                     final item = prakiraan[index];
-                    final waktuRaw = item["local_datetime"] ?? "";
-                    final waktu = waktuRaw.isNotEmpty
-                        ? DateFormat(
-                            "EEEE, dd MMM yyyy",
-                            "id_ID",
-                          ).format(DateTime.parse(waktuRaw))
-                        : "-";
+                    final waktu = item["local_datetime"].toString();
 
                     return CuacaCard(
                       icon: getIcon(item["weather_desc"] ?? ""),
-                      suhu: (item["t"] ?? 0).toString(),
-                      kondisi: item["weather_desc"] ?? "-",
-                      kelembapan: (item["hu"] ?? 0).toString(),
+                      suhu: item["t"].toString(),
+                      kondisi: item["weather_desc"] ?? "",
+                      angin: "${item["ws"]} km/h",
+                      kelembapan: item["hu"].toString(),
                       waktu: waktu,
-                      isToday: index == 0,
+                      isToday: index == 0, // card pertama dianggap hari ini
                     );
                   },
                 ),
         ),
-        const SizedBox(height: 16),
-        Text(
-          "Sumber: OpenWeatherMap + AI (Local Flask)",
-          style: GoogleFonts.quicksand(fontSize: 12),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Text(
+              "Sumber: ",
+              style: TextStyle(fontSize: 10, color: AppColors.text),
+            ),
+            SizedBox(width: 4),
+            SizedBox(
+              height: 16,
+              child: Image.asset("assets/images/logo/logo-bmkg.png"),
+            ),
+            SizedBox(width: 4),
+            Text("BMKG", style: TextStyle(fontSize: 10, color: AppColors.text)),
+          ],
         ),
       ],
     );

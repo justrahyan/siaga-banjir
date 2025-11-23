@@ -297,10 +297,7 @@ class _HomePageState extends State<HomePage> {
               const SizedBox(height: 16),
               Padding(
                 padding: EdgeInsets.symmetric(horizontal: 16.0),
-                child: CuacaSection(
-                  latitude: widget.latitude,
-                  longitude: widget.longitude,
-                ),
+                child: CuacaSection(kodeWilayah: "31.71.03.1001"),
               ),
             ],
           ),
