@@ -68,6 +68,12 @@ class _HomePageState extends State<HomePage> {
   bool _isLoading = true;
   int _batteryPercentage = 100;
 
+  // === NEW: Variabel untuk timeout koneksi ===
+  Timer? _koneksiTimer;
+  DateTime? _lastSensorChangeTime;
+  double? _lastUltrasonic;
+  double? _lastWaterLevel;
+
   @override
   void initState() {
     super.initState();
@@ -77,6 +83,7 @@ class _HomePageState extends State<HomePage> {
   @override
   void dispose() {
     _alatSubscription?.cancel();
+    _koneksiTimer?.cancel(); // NEW
     super.dispose();
   }
 
@@ -133,15 +140,30 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _listenToDevice(String deviceKey) {
-    // Hentikan listener lama
+    // Hentikan listener & timer lama
     _alatSubscription?.cancel();
+    _koneksiTimer?.cancel();
+    _lastSensorChangeTime = null;
+    _lastUltrasonic = null;
+    _lastWaterLevel = null;
+
     print("🎧 Mulai mendengarkan data untuk $deviceKey...");
+
+    // Timer cek timeout tiap 1 menit
+    _koneksiTimer = Timer.periodic(const Duration(minutes: 1), (timer) {
+      // Jangan sampai callback jalan setelah widget disposed
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      _checkKoneksiTimeout();
+    });
 
     _alatSubscription = _database
         .child('Alat/$deviceKey')
         .onValue
         .listen(
-          (event) {
+          (event) async {
             final data = event.snapshot.value as Map?;
             if (data == null) {
               if (mounted) setState(() => _isLoading = false);
@@ -161,11 +183,43 @@ class _HomePageState extends State<HomePage> {
             final dynamic koneksiData = data['koneksi'];
             final bool isKoneksiOn =
                 (koneksiData == true || koneksiData == 'true');
+
+            // Deteksi perubahan sensor
+            final bool firstRead =
+                (_lastUltrasonic == null || _lastWaterLevel == null);
+            final bool sensorChanged =
+                firstRead ||
+                (_lastUltrasonic != ultrasonic ||
+                    _lastWaterLevel != waterLevel);
+
+            if (sensorChanged) {
+              _lastSensorChangeTime = DateTime.now();
+              _lastUltrasonic = ultrasonic;
+              _lastWaterLevel = waterLevel;
+
+              // Kalau di DB koneksi=false tapi ada data baru → set true
+              if (!isKoneksiOn) {
+                try {
+                  await _database.child('Alat/$deviceKey/koneksi').set(true);
+                } catch (e) {
+                  debugPrint("Gagal set koneksi=true: $e");
+                }
+              }
+            }
+
+            // Tentukan status koneksi untuk UI
+            bool isConnectedNow = isKoneksiOn;
+            if (_lastSensorChangeTime != null) {
+              final diff = DateTime.now().difference(_lastSensorChangeTime!);
+              if (diff.inMinutes >= 5) {
+                isConnectedNow = false;
+              }
+            }
+
             if (mounted) {
               setState(() {
                 _deviceName = data['nama_alat'];
-                _isConnected =
-                    (data['koneksi'] == true || data['koneksi'] == 'true');
+                _isConnected = isConnectedNow;
                 _isSolarPower = isSolar;
                 _waterLevel = waterLevel;
                 _ultrasonic = ultrasonic;
@@ -180,6 +234,33 @@ class _HomePageState extends State<HomePage> {
             if (mounted) setState(() => _isLoading = false);
           },
         );
+  }
+
+  // 🔌 Cek apakah sudah lebih dari 5 menit tanpa perubahan sensor
+  Future<void> _checkKoneksiTimeout() async {
+    if (!mounted) return;
+    if (_selectedDeviceKey == null) return;
+    if (_lastSensorChangeTime == null) return;
+
+    final diff = DateTime.now().difference(_lastSensorChangeTime!);
+    final bool shouldOffline = diff.inMinutes >= 5;
+
+    if (!shouldOffline) return;
+
+    // Kalau di UI masih dianggap connected, turunkan jadi offline
+    if (_isConnected == true) {
+      try {
+        await _database.child('Alat/$_selectedDeviceKey/koneksi').set(false);
+
+        if (!mounted) return;
+        setState(() {
+          _isConnected = false;
+          _lastUpdated = "Tidak ada data baru selama lebih dari 5 menit";
+        });
+      } catch (e) {
+        debugPrint("Gagal update koneksi ke false: $e");
+      }
+    }
   }
 
   // 🔆 Cek waktu untuk sumber daya
@@ -296,7 +377,7 @@ class _HomePageState extends State<HomePage> {
               ),
               const SizedBox(height: 16),
               Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16.0),
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
                 child: CuacaSection(kodeWilayah: "31.71.03.1001"),
               ),
             ],
@@ -499,12 +580,10 @@ class _HomePageState extends State<HomePage> {
             children: [
               if (_deviceList.isNotEmpty && _selectedDeviceKey != null)
                 PopupMenuButton<String>(
-                  // Ini adalah tampilan widget (Teks + Ikon)
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        // Tampilkan nama alat yg dipilih, atau "Memuat..."
                         _deviceName ??
                             _deviceList[_selectedDeviceKey] ??
                             'Memuat...',
@@ -518,7 +597,6 @@ class _HomePageState extends State<HomePage> {
                       const Icon(Icons.arrow_drop_down, color: Colors.white),
                     ],
                   ),
-                  // Ini adalah daftar item di menu dropdown
                   itemBuilder: (BuildContext context) {
                     return _deviceList.entries.map((entry) {
                       return PopupMenuItem<String>(
@@ -530,7 +608,6 @@ class _HomePageState extends State<HomePage> {
                       );
                     }).toList();
                   },
-                  // Aksi saat item dipilih
                   onSelected: (String newKey) {
                     if (newKey != _selectedDeviceKey) {
                       setState(() {
@@ -550,7 +627,6 @@ class _HomePageState extends State<HomePage> {
                     borderRadius: BorderRadius.circular(10),
                   ),
                 )
-              // Tampilkan placeholder jika masih loading atau tidak ada alat
               else
                 Text(
                   _isLoading ? 'Memuat alat...' : '-',

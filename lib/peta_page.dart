@@ -19,7 +19,9 @@ class PetaPage extends StatefulWidget {
 class _PetaPageState extends State<PetaPage> {
   bool _isMapLoading = true;
   bool _showDetail = false;
-  late GoogleMapController _controller;
+
+  /// 🔧 DIUBAH: nullable, bukan late
+  GoogleMapController? _controller;
 
   final _auth = FirebaseAuth.instance;
   final _db = FirebaseDatabase.instanceFor(
@@ -31,7 +33,6 @@ class _PetaPageState extends State<PetaPage> {
   LatLng? _userLocation;
   Map<String, dynamic>? _selectedAlat;
   final Map<String, Marker> _markers = {};
-  Stream<DatabaseEvent>? _alatStream;
   StreamSubscription? _alatSubscription;
 
   @override
@@ -42,9 +43,10 @@ class _PetaPageState extends State<PetaPage> {
 
   @override
   void dispose() {
-    // Matikan listener saat widget dihancurkan
     _alatSubscription?.cancel();
-    _controller.dispose();
+
+    /// 🔧 DIUBAH: cek null dulu
+    _controller?.dispose();
     super.dispose();
   }
 
@@ -54,7 +56,7 @@ class _PetaPageState extends State<PetaPage> {
         desiredAccuracy: LocationAccuracy.high,
       );
 
-      if (!mounted) return; // ✅ pastikan widget masih aktif sebelum setState
+      if (!mounted) return;
       setState(() => _userLocation = LatLng(pos.latitude, pos.longitude));
     } catch (e) {
       print("❌ Gagal mendapatkan lokasi pengguna: $e");
@@ -64,83 +66,88 @@ class _PetaPageState extends State<PetaPage> {
   /// 🔁 Listen data alat secara realtime
   void _listenRealtimeAlat() {
     _alatSubscription?.cancel();
-    _alatStream = _db.child('Alat').onValue;
-    _alatSubscription = _alatStream!.listen(
-      (event) {
-        final data = event.snapshot.value;
-        if (data == null) {
-          print(
-            "⚠️ PetaPage: Tidak ada data alat di database (snapshot is null)",
-          );
-          if (mounted) setState(() => _markers.clear());
-          return;
-        }
+    _alatSubscription = _db
+        .child('Alat')
+        .onValue
+        .listen(
+          (event) {
+            final data = event.snapshot.value;
+            if (data == null) {
+              print(
+                "⚠️ PetaPage: Tidak ada data alat di database (snapshot is null)",
+              );
+              if (mounted) setState(() => _markers.clear());
+              return;
+            }
 
-        print("✅ PetaPage: Data diterima dari Firebase, memproses...");
+            print("✅ PetaPage: Data diterima dari Firebase, memproses...");
 
-        final alatMap = Map<String, dynamic>.from(data as Map);
-        // Gunakan map baru untuk perbandingan, agar lebih efisien
-        final Map<String, Marker> newMarkers = {};
+            final alatMap = Map<String, dynamic>.from(data as Map);
+            final Map<String, Marker> newMarkers = {};
 
-        alatMap.forEach((key, value) {
-          final alat = Map<String, dynamic>.from(value);
-          if (alat['koordinat'] == null) {
-            print("⚠️ Alat $key tidak punya koordinat");
-            return;
-          }
-
-          final koordinat = Map<String, dynamic>.from(alat['koordinat']);
-          if (koordinat['latitude'] == null || koordinat['longitude'] == null) {
-            print("⚠️ Koordinat alat $key tidak lengkap");
-            return;
-          }
-
-          final lat = (koordinat['latitude'] as num).toDouble();
-          final lng = (koordinat['longitude'] as num).toDouble();
-
-          print("📍 Menambahkan marker untuk $key ($lat, $lng)");
-
-          newMarkers[key] = Marker(
-            // Simpan di map baru
-            markerId: MarkerId(key),
-            position: LatLng(lat, lng),
-            icon: BitmapDescriptor.defaultMarkerWithHue(
-              BitmapDescriptor.hueAzure,
-            ),
-            infoWindow: InfoWindow(title: alat['nama_alat']),
-            onTap: () {
-              if (mounted) {
-                setState(() {
-                  _selectedAlat = alat;
-                  _showDetail = true;
-                });
+            alatMap.forEach((key, value) {
+              final alat = Map<String, dynamic>.from(value);
+              if (alat['koordinat'] == null) {
+                print("⚠️ Alat $key tidak punya koordinat");
+                return;
               }
-            },
-          );
-        });
 
-        if (mounted) {
-          setState(() {
-            _markers.clear();
-            _markers.addAll(newMarkers);
-          });
-        }
+              final koordinat = Map<String, dynamic>.from(alat['koordinat']);
+              if (koordinat['latitude'] == null ||
+                  koordinat['longitude'] == null) {
+                print("⚠️ Koordinat alat $key tidak lengkap");
+                return;
+              }
 
-        // Pindahkan logika animasi kamera ke sini
-        if (_markers.isNotEmpty && mounted) {
-          Future.delayed(const Duration(milliseconds: 300), () {
-            final bounds = _calculateBounds(
-              _markers.values.map((m) => m.position).toList(),
-            );
-            // _controller dijamin sudah ada karena dipanggil dari onMapCreated
-            _controller.animateCamera(CameraUpdate.newLatLngBounds(bounds, 80));
-          });
-        }
-      },
-      onError: (error) {
-        print("❌❌❌ PetaPage: GAGAL MENDENGARKAN DATA: $error");
-      },
-    );
+              final lat = (koordinat['latitude'] as num).toDouble();
+              final lng = (koordinat['longitude'] as num).toDouble();
+
+              print("📍 Menambahkan marker untuk $key ($lat, $lng)");
+
+              newMarkers[key] = Marker(
+                markerId: MarkerId(key),
+                position: LatLng(lat, lng),
+                icon: BitmapDescriptor.defaultMarkerWithHue(
+                  BitmapDescriptor.hueAzure,
+                ),
+                infoWindow: InfoWindow(title: alat['nama_alat']),
+                onTap: () {
+                  if (mounted) {
+                    setState(() {
+                      _selectedAlat = alat;
+                      _showDetail = true;
+                    });
+                  }
+                },
+              );
+            });
+
+            if (mounted) {
+              setState(() {
+                _markers
+                  ..clear()
+                  ..addAll(newMarkers);
+              });
+            }
+
+            // 🔧 DIUBAH: pastikan controller tidak null & widget masih mounted
+            if (_markers.isNotEmpty && mounted && _controller != null) {
+              Future.delayed(const Duration(milliseconds: 300), () {
+                if (!mounted || _controller == null) return;
+
+                final bounds = _calculateBounds(
+                  _markers.values.map((m) => m.position).toList(),
+                );
+                _controller!.animateCamera(
+                  CameraUpdate.newLatLngBounds(bounds, 80),
+                );
+              });
+            }
+          },
+          onError: (error) {
+            print("❌❌❌ PetaPage: GAGAL MENDENGARKAN DATA: $error");
+          },
+        );
   }
 
   LatLngBounds _calculateBounds(List<LatLng> positions) {
@@ -163,9 +170,10 @@ class _PetaPageState extends State<PetaPage> {
   }
 
   Future<void> _refreshMap() async {
+    if (!mounted) return;
     setState(() => _isMapLoading = true);
     _listenRealtimeAlat();
-    setState(() => _isMapLoading = false);
+    if (mounted) setState(() => _isMapLoading = false);
   }
 
   bool _checkSolarTime() {
@@ -189,11 +197,9 @@ class _PetaPageState extends State<PetaPage> {
   }
 
   void _onMapCreated(GoogleMapController controller) async {
-    // <-- JADIKAN ASYNC
-    _controller = controller;
+    _controller = controller; // 🔧 simpan controller
 
     try {
-      // Cek apakah sudah login
       if (_auth.currentUser == null) {
         print("🔐 PetaPage: Belum login, mencoba login admin...");
         await _auth.signInWithEmailAndPassword(
@@ -205,13 +211,11 @@ class _PetaPageState extends State<PetaPage> {
         print("👍 PetaPage: Pengguna sudah login.");
       }
 
-      // Panggil listener SETELAH berhasil auth
       _listenRealtimeAlat();
     } catch (e) {
       print("❌❌❌ PetaPage: GAGAL login atau inisialisasi: $e");
     }
 
-    // Pindahkan set loading state ke sini
     if (mounted) {
       setState(() => _isMapLoading = false);
     }
@@ -251,7 +255,22 @@ class _PetaPageState extends State<PetaPage> {
             onMapCreated: _onMapCreated,
             onTap: (_) => setState(() => _showDetail = false),
           ),
-          if (_isMapLoading) const Center(child: CircularProgressIndicator()),
+          if (_isMapLoading)
+            const Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation(AppColors.primary),
+                  ),
+                  SizedBox(height: 12),
+                  Text(
+                    "Memuat peta...",
+                    style: TextStyle(color: AppColors.text, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
           if (_showDetail && _selectedAlat != null) _buildDetailCard(),
         ],
       ),
@@ -300,18 +319,17 @@ class _PetaPageState extends State<PetaPage> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(
-                    alat['Sensor']?['koneksi'] == true
-                        ? Icons.wifi
-                        : Icons.wifi_off,
-                    color: alat['Sensor']?['koneksi'] == true
+                    // 🔧 struktur di DB: koneksi ada di root alat, bukan di Sensor
+                    alat['koneksi'] == true ? Icons.wifi : Icons.wifi_off,
+                    color: alat['koneksi'] == true
                         ? Colors.green
                         : Colors.redAccent,
                   ),
                   const SizedBox(width: 6),
                   Text(
-                    alat['Sensor']?['koneksi'] == true ? 'Online' : 'Offline',
+                    alat['koneksi'] == true ? 'Online' : 'Offline',
                     style: GoogleFonts.quicksand(
-                      color: alat['Sensor']?['koneksi'] == true
+                      color: alat['koneksi'] == true
                           ? Colors.green
                           : Colors.redAccent,
                     ),
